@@ -53,10 +53,13 @@ export default function SignupScreen() {
     password.trim().length >= 6;
 
   const handleCreateAccount = useCallback(() => {
-    // TODO: integrate with backend signup
+    // TODO: integrate with backend signup & validation
     setLoading(true);
-    setTimeout(() => setLoading(false), 1500);
-  }, []);
+    setTimeout(() => {
+      setLoading(false);
+      router.replace("/(tabs)" as any);
+    }, 800);
+  }, [router]);
 
   const handleGoogleSignup = useCallback(() => {
     // TODO: integrate Google OAuth

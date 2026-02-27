@@ -46,10 +46,13 @@ export default function LoginScreen() {
   const [loading, setLoading] = useState(false);
 
   const handleConnect = useCallback(() => {
-    // TODO: integrate with backend auth
+    // TODO: integrate with backend auth & validation
     setLoading(true);
-    setTimeout(() => setLoading(false), 1500);
-  }, []);
+    setTimeout(() => {
+      setLoading(false);
+      router.replace("/(tabs)" as any);
+    }, 800);
+  }, [router]);
 
   const handleGoogleLogin = useCallback(() => {
     // TODO: integrate Google OAuth
