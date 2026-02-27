@@ -1,20 +1,25 @@
 import React from "react";
-import { View, Pressable, StyleSheet, Text, LayoutChangeEvent } from "react-native";
+import { View, Pressable, StyleSheet, Text } from "react-native";
 import { BottomTabBarProps } from "@react-navigation/bottom-tabs";
 import Animated, {
   useAnimatedStyle,
+  useAnimatedProps,
+  useSharedValue,
   withSpring,
   withTiming,
   interpolate,
+  useDerivedValue,
 } from "react-native-reanimated";
-import Svg, { Path, Rect, Circle } from "react-native-svg";
+import Svg, { Path, Rect, Circle, Defs, RadialGradient, Stop } from "react-native-svg";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { Colors } from "@/constants/colors";
 import { Typography } from "@/constants/typography";
 
+const AnimatedPath = Animated.createAnimatedComponent(Path);
+
 /* ──────────────────────────────────────────────────────────
- * Icons (mimicking the reference image)
+ * Icons
  * ────────────────────────────────────────────────────────── */
 
 const HomeIcon = ({ color }: { color: string }) => (
@@ -27,10 +32,10 @@ const HomeIcon = ({ color }: { color: string }) => (
 
 const InsightsIcon = ({ color }: { color: string }) => (
   <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
-    <Rect x="3" y="4" width="18" height="16" rx="2" stroke={color} strokeWidth={2} strokeLinecap="round" />
-    <Circle cx="8" cy="9" r="1" fill={color} />
-    <Circle cx="8" cy="15" r="1" fill={color} />
-    <Path d="M12 9H16M12 15H16" stroke={color} strokeWidth={2} strokeLinecap="round" />
+    <Rect x="3" y="4" width="18" height="16" rx="3" stroke={color} strokeWidth={2} strokeLinecap="round" />
+    <Circle cx="8" cy="10" r="1.5" fill={color} />
+    <Circle cx="8" cy="16" r="1.5" fill={color} />
+    <Path d="M12 10H16M12 16H16" stroke={color} strokeWidth={2} strokeLinecap="round" />
   </Svg>
 );
 
@@ -50,145 +55,220 @@ const PlusIcon = () => (
 );
 
 /* ──────────────────────────────────────────────────────────
- * Types & Constants
+ * Constants & Colors
  * ────────────────────────────────────────────────────────── */
 
+// Standardize route to icon mapping
 const TAB_ICONS: Record<string, (props: { color: string }) => React.JSX.Element> = {
   index: HomeIcon,
   statistics: InsightsIcon,
-  journal: ChatIcon, // Treating journal as the Chat icon for now
-  profile: HomeIcon, // Fallback if used
+  journal: ChatIcon,
 };
 
-// Colors from the design
-const BG_DARK = "#252525";    // Dark container
-const ITEM_BG = "#3D3D3D";    // Active icon background
+const BG_DARK = "#252525";    // Outer gooey container
+const ITEM_BG = "#3D3D3D";    // Inner pill/circle background
 const TEXT_ACTIVE = "#FFFFFF";
 const ICON_INACTIVE = "#A0A0A0";
 const ICON_ACTIVE = "#FFFFFF";
 const BLUE_BTN = "#2B8CFF";
 
 // Layout metrics
-const TAB_HEIGHT = 64;
-const ICON_SIZE = 48;
-const PADDING = 8;
-const EXPANDED_WIDTH = 130;
-const COLLAPSED_WIDTH = ICON_SIZE;
+const TAB_HEIGHT = 64;       // Outer container height
+const ICON_SIZE = 48;        // Inner item height (and width when inactive)
+const EXPANDED_WIDTH = 110;  // Inner item width when active
+const INNER_GAP = 8;         // Gap between inner items
 
 /* ──────────────────────────────────────────────────────────
- * Animated Tab Item
- * ────────────────────────────────────────────────────────── */
-
-interface TabItemProps {
-  label: string;
-  routeName: string;
-  isFocused: boolean;
-  onPress: () => void;
-  onLongPress: () => void;
-}
-
-const TabItem = ({ label, routeName, isFocused, onPress, onLongPress }: TabItemProps) => {
-  const Icon = TAB_ICONS[routeName] || HomeIcon;
-
-  // Spring config for the bouncy liquid feel
-  const springConfig = { damping: 16, stiffness: 120, mass: 0.8 };
-
-  const animatedStyle = useAnimatedStyle(() => {
-    const width = withSpring(isFocused ? EXPANDED_WIDTH : COLLAPSED_WIDTH, springConfig);
-    return { width };
-  });
-
-  const textStyle = useAnimatedStyle(() => {
-    const opacity = withTiming(isFocused ? 1 : 0, { duration: 200 });
-    const translateX = withSpring(isFocused ? 0 : -10, springConfig);
-    return {
-      opacity,
-      transform: [{ translateX }],
-    };
-  });
-
-  return (
-    <Pressable
-      onPress={onPress}
-      onLongPress={onLongPress}
-      style={styles.tabItemPressable}
-    >
-      <Animated.View style={[styles.tabItemContainer, animatedStyle]}>
-        <View style={styles.iconCircle}>
-          <Icon color={isFocused ? ICON_ACTIVE : ICON_INACTIVE} />
-        </View>
-        <Animated.View style={[styles.labelContainer, textStyle]}>
-          <Text style={styles.labelText} numberOfLines={1}>
-            {label}
-          </Text>
-        </Animated.View>
-      </Animated.View>
-    </Pressable>
-  );
-};
-
-/* ──────────────────────────────────────────────────────────
- * Main Tab Bar Component
+ * Custom Tab Bar
  * ────────────────────────────────────────────────────────── */
 
 export function CustomTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
   const insets = useSafeAreaInsets();
+  
+  // Reanimated shared value for active index
+  const activeIndex = useSharedValue(state.index);
+
+  React.useEffect(() => {
+    activeIndex.value = withSpring(state.index, { damping: 14, stiffness: 120, mass: 0.8 });
+  }, [state.index, activeIndex]);
+
+  // Derived Values for Inner Item Positions & Widths
+  const items = [0, 1, 2].map((i) => {
+    return useDerivedValue(() => {
+      // Widths
+      const w0 = interpolate(activeIndex.value, [0, 1, 2], [EXPANDED_WIDTH, ICON_SIZE, ICON_SIZE]);
+      const w1 = interpolate(activeIndex.value, [0, 1, 2], [ICON_SIZE, EXPANDED_WIDTH, ICON_SIZE]);
+      const w2 = interpolate(activeIndex.value, [0, 1, 2], [ICON_SIZE, ICON_SIZE, EXPANDED_WIDTH]);
+
+      // X positions
+      const x0 = 8;
+      const x1 = x0 + w0 + INNER_GAP;
+      const x2 = x1 + w1 + INNER_GAP;
+
+      const widths = [w0, w1, w2];
+      const positions = [x0, x1, x2];
+
+      return { w: widths[i], x: positions[i] };
+    });
+  });
+
+  // Animated gooey background SVG Path
+  const animatedProps = useAnimatedProps(() => {
+    const w0 = interpolate(activeIndex.value, [0, 1, 2], [EXPANDED_WIDTH, ICON_SIZE, ICON_SIZE]);
+    const w1 = interpolate(activeIndex.value, [0, 1, 2], [ICON_SIZE, EXPANDED_WIDTH, ICON_SIZE]);
+    const w2 = interpolate(activeIndex.value, [0, 1, 2], [ICON_SIZE, ICON_SIZE, EXPANDED_WIDTH]);
+
+    const x0 = 8;
+    const x1 = x0 + w0 + INNER_GAP;
+    const x2 = x1 + w1 + INNER_GAP;
+
+    // Outer hulls
+    const ox0 = x0 - 8;
+    const orx0 = ox0 + w0 + 16;
+    const ox1 = x1 - 8;
+    const orx1 = ox1 + w1 + 16;
+    const ox2 = x2 - 8;
+    const orx2 = ox2 + w2 + 16;
+
+    const gap = -8; // Overlap for the gooey effect
+    const h = TAB_HEIGHT;
+    const r = 32;
+    const dip = 6; // Depth of the concavity between items
+
+    // Top bridge 0 -> 1
+    const t0_P0 = orx0 - 16;
+    const t0_M = orx0 + gap / 2;
+    const t0_P3 = ox1 + 16;
+    const t0_C1 = `C ${t0_P0 + 8},0 ${t0_M - 4},${dip} ${t0_M},${dip}`;
+    const t0_C2 = `C ${t0_M + 4},${dip} ${t0_P3 - 8},0 ${t0_P3},0`;
+
+    // Top bridge 1 -> 2
+    const t1_P0 = orx1 - 16;
+    const t1_M = orx1 + gap / 2;
+    const t1_P3 = ox2 + 16;
+    const t1_C1 = `C ${t1_P0 + 8},0 ${t1_M - 4},${dip} ${t1_M},${dip}`;
+    const t1_C2 = `C ${t1_M + 4},${dip} ${t1_P3 - 8},0 ${t1_P3},0`;
+
+    // Bottom bridge 2 -> 1 (drawn right to left)
+    const b1_P0 = ox2 + 16;
+    const b1_M = orx1 + gap / 2;
+    const b1_P3 = orx1 - 16;
+    const b1_C1 = `C ${b1_P0 - 8},${h} ${b1_M + 4},${h - dip} ${b1_M},${h - dip}`;
+    const b1_C2 = `C ${b1_M - 4},${h - dip} ${b1_P3 + 8},${h} ${b1_P3},${h}`;
+
+    // Bottom bridge 1 -> 0
+    const b0_P0 = ox1 + 16;
+    const b0_M = orx0 + gap / 2;
+    const b0_P3 = orx0 - 16;
+    const b0_C1 = `C ${b0_P0 - 8},${h} ${b0_M + 4},${h - dip} ${b0_M},${h - dip}`;
+    const b0_C2 = `C ${b0_M - 4},${h - dip} ${b0_P3 + 8},${h} ${b0_P3},${h}`;
+
+    const d = `
+      M ${ox0 + r},0
+      L ${t0_P0},0
+      ${t0_C1}
+      ${t0_C2}
+      L ${t1_P0},0
+      ${t1_C1}
+      ${t1_C2}
+      L ${orx2 - r},0
+      A ${r},${r} 0 0,1 ${orx2},${r}
+      A ${r},${r} 0 0,1 ${orx2 - r},${h}
+      L ${b1_P0},${h}
+      ${b1_C1}
+      ${b1_C2}
+      L ${b0_P0},${h}
+      ${b0_C1}
+      ${b0_C2}
+      L ${ox0 + r},${h}
+      A ${r},${r} 0 0,1 ${ox0},${h - r}
+      A ${r},${r} 0 0,1 ${ox0 + r},0
+      Z
+    `;
+    return { d };
+  });
 
   return (
     <View style={[styles.wrapper, { bottom: insets.bottom > 0 ? insets.bottom : 20 }]}>
       
-      {/* ── Main Tab Segment ───────────────────────────── */}
+      {/* ── Grouped Gooey Tabs ────────────────────────────── */}
       <View style={styles.segmentContainer}>
+        {/* The SVG Morphing Web Background */}
+        <Svg width={300} height={TAB_HEIGHT} style={StyleSheet.absoluteFill}>
+          <AnimatedPath animatedProps={animatedProps} fill={BG_DARK} />
+        </Svg>
+
+        {/* The Inner Absolute Items */}
         {state.routes.map((route, index) => {
-          // Skip 'profile' tab to match the 3-tab layout in the image
           if (route.name === "profile") return null;
 
-          const { options } = descriptors[route.key];
-          const label =
-            options.tabBarLabel !== undefined
-              ? (options.tabBarLabel as string)
-              : options.title !== undefined
-              ? options.title
-              : route.name;
+          // Override label for journal to match design perfectly
+          let label = "Home";
+          if (route.name === "statistics") label = "Insights";
+          if (route.name === "journal") label = "AI Chat";
 
           const isFocused = state.index === index;
-
+          const Icon = TAB_ICONS[route.name] || HomeIcon;
+          
           const onPress = () => {
-            const event = navigation.emit({
-              type: "tabPress",
-              target: route.key,
-              canPreventDefault: true,
-            });
-
-            if (!isFocused && !event.defaultPrevented) {
-              navigation.navigate(route.name);
-            }
+            const event = navigation.emit({ type: "tabPress", target: route.key, canPreventDefault: true });
+            if (!isFocused && !event.defaultPrevented) navigation.navigate(route.name);
           };
 
-          const onLongPress = () => {
-            navigation.emit({
-              type: "tabLongPress",
-              target: route.key,
-            });
-          };
+          const itemAnimatedStyle = useAnimatedStyle(() => ({
+            width: items[index].value.w,
+            left: items[index].value.x,
+          }));
+
+          const textAnimatedStyle = useAnimatedStyle(() => {
+             const progress = interpolate(activeIndex.value,
+               [index - 1, index, index + 1],
+               [-1, 1, -1],
+               "clamp"
+             );
+             // When this index is active, progress = 1.
+             // When inactive, progress = -1.
+             const isActiveFloat = Math.max(0, progress); // 1 when active, 0 otherwise
+
+             const opacity = withTiming(isActiveFloat > 0.5 ? 1 : 0, { duration: 200 });
+             const translateX = interpolate(isActiveFloat, [0, 1], [-10, 0]);
+             return { opacity, transform: [{ translateX }] };
+          });
 
           return (
-            <TabItem
-              key={route.key}
-              label={label === "index" ? "Home" : label}
-              routeName={route.name}
-              isFocused={isFocused}
-              onPress={onPress}
-              onLongPress={onLongPress}
-            />
+            <Animated.View key={route.key} style={[styles.tabItem, itemAnimatedStyle]}>
+              <Pressable onPress={onPress} style={styles.pressableFill}>
+                <View style={styles.iconWrapper}>
+                  <Icon color={isFocused ? ICON_ACTIVE : ICON_INACTIVE} />
+                </View>
+                <Animated.View style={[styles.labelWrapper, textAnimatedStyle]} pointerEvents="none">
+                  <Text style={styles.labelText} numberOfLines={1}>{label}</Text>
+                </Animated.View>
+              </Pressable>
+            </Animated.View>
           );
         })}
       </View>
 
-      {/* ── Floating Action Button (Blue) ──────────────── */}
-      <Pressable style={styles.fab} accessibilityLabel="Create new">
-        <PlusIcon />
-      </Pressable>
+      {/* ── Glowing Floating Action Button (Blue) ─────────── */}
+      <View style={styles.fabContainer}>
+        {/* Custom Glow Layer */}
+        <Svg width={100} height={100} style={styles.fabGlowSvg} pointerEvents="none">
+          <Defs>
+            <RadialGradient id="glow" cx="50%" cy="50%" r="50%" fx="50%" fy="50%">
+              <Stop offset="0%" stopColor={BLUE_BTN} stopOpacity="0.8" />
+              <Stop offset="60%" stopColor={BLUE_BTN} stopOpacity="0.4" />
+              <Stop offset="100%" stopColor={BLUE_BTN} stopOpacity="0" />
+            </RadialGradient>
+          </Defs>
+          <Circle cx="50" cy="50" r="50" fill="url(#glow)" />
+        </Svg>
+        
+        <Pressable style={styles.fab} accessibilityLabel="Create new">
+          <PlusIcon />
+        </Pressable>
+      </View>
+      
     </View>
   );
 }
@@ -200,47 +280,44 @@ export function CustomTabBar({ state, descriptors, navigation }: BottomTabBarPro
 const styles = StyleSheet.create({
   wrapper: {
     position: "absolute",
-    left: 20,
-    right: 20,
+    left: 16,
+    right: 16,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
   },
   segmentContainer: {
-    flexDirection: "row",
-    backgroundColor: BG_DARK,
+    width: 260, // Total outer width for 3 items
     height: TAB_HEIGHT,
-    borderRadius: TAB_HEIGHT / 2,
-    padding: PADDING,
-    alignItems: "center",
-    gap: 4,
+    position: "relative",
   },
-  tabItemPressable: {
-    height: ICON_SIZE,
-  },
-  tabItemContainer: {
-    height: ICON_SIZE,
-    borderRadius: ICON_SIZE / 2,
-    flexDirection: "row",
-    alignItems: "center",
-    overflow: "hidden",
-  },
-  iconCircle: {
-    width: ICON_SIZE,
+  tabItem: {
+    position: "absolute",
+    top: 8,
     height: ICON_SIZE,
     borderRadius: ICON_SIZE / 2,
     backgroundColor: ITEM_BG,
+    overflow: "hidden",
+    flexDirection: "row",
+  },
+  pressableFill: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  iconWrapper: {
+    width: ICON_SIZE,
+    height: ICON_SIZE,
     alignItems: "center",
     justifyContent: "center",
     zIndex: 2,
   },
-  labelContainer: {
+  labelWrapper: {
     position: "absolute",
-    left: ICON_SIZE,
+    left: ICON_SIZE - 4,
     right: 0,
     height: "100%",
     justifyContent: "center",
-    paddingLeft: 8,
     zIndex: 1,
   },
   labelText: {
@@ -249,17 +326,26 @@ const styles = StyleSheet.create({
     fontWeight: "500",
     fontFamily: Typography.fontFamily,
   },
-  fab: {
+  fabContainer: {
     width: TAB_HEIGHT,
     height: TAB_HEIGHT,
-    borderRadius: TAB_HEIGHT / 2,
+    alignItems: "center",
+    justifyContent: "center",
+    position: "relative",
+  },
+  fab: {
+    width: TAB_HEIGHT - 8,
+    height: TAB_HEIGHT - 8,
+    borderRadius: (TAB_HEIGHT - 8) / 2,
     backgroundColor: BLUE_BTN,
     alignItems: "center",
     justifyContent: "center",
-    shadowColor: BLUE_BTN,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.4,
-    shadowRadius: 12,
-    elevation: 8,
+    zIndex: 2,
+  },
+  fabGlowSvg: {
+    position: "absolute",
+    top: -22,
+    left: -22,
+    zIndex: 1,
   },
 });
