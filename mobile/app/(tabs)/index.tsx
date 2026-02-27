@@ -11,6 +11,8 @@ import { StatusBar } from "expo-status-bar";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Svg, { Path, Circle } from "react-native-svg";
 
+import { useRouter } from "expo-router";
+
 import { MoodSelector } from "@/components/home/MoodSelector";
 import { ActivityCard } from "@/components/home/ActivityCard";
 import { Colors } from "@/constants/colors";
@@ -62,6 +64,7 @@ function getGreeting(): string {
 
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
+  const router = useRouter();
   const [selectedMood, setSelectedMood] = useState<string | null>(null);
 
   const handleMoodSelect = useCallback((key: string) => {
@@ -123,12 +126,14 @@ export default function HomeScreen() {
               subtitle="5 min guided calm"
               backgroundColor="#FFF3EC"
               style={styles.activityCardLeft}
+              onPress={() => router.push("/breathing" as any)}
             />
             <ActivityCard
               title="Mood Journal"
               subtitle="Reflect on your day"
               backgroundColor="#F0EBE5"
               style={styles.activityCardRight}
+              onPress={() => router.navigate("/(tabs)/journal" as any)}
             />
           </View>
 
