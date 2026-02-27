@@ -73,30 +73,27 @@ export default function HomeScreen() {
       <StatusBar style="dark" />
 
       <ScrollView
-        contentContainerStyle={[
-          styles.scrollContent,
-          { paddingTop: insets.top + Spacing.base, paddingBottom: 100 },
-        ]}
+        contentContainerStyle={{ paddingBottom: 100 }}
         showsVerticalScrollIndicator={false}
+        bounces={false}
       >
-        {/* ── Header ─────────────────────────────────────── */}
-        <View style={styles.header}>
-          <View style={styles.headerLeft}>
-            <View style={styles.avatar}>
-              <Text style={styles.avatarText}>😊</Text>
+        {/* ── Top Header Section (Edge-to-Edge) ──────────────── */}
+        <View style={[styles.topSection, { paddingTop: insets.top + Spacing.md }]}>
+          <View style={styles.header}>
+            <View style={styles.headerLeft}>
+              <View style={styles.avatar}>
+                <Text style={styles.avatarText}>😊</Text>
+              </View>
+              <View style={styles.headerTextBlock}>
+                <Text style={styles.greeting}>Hi 👋</Text>
+                <Text style={styles.userName}>Friend</Text>
+              </View>
             </View>
-            <View style={styles.headerTextBlock}>
-              <Text style={styles.greeting}>Hi 👋</Text>
-              <Text style={styles.userName}>Friend</Text>
-            </View>
+            <Pressable style={styles.bellButton} accessibilityLabel="Notifications">
+              <BellIcon />
+            </Pressable>
           </View>
-          <Pressable style={styles.bellButton} accessibilityLabel="Notifications">
-            <BellIcon />
-          </Pressable>
-        </View>
 
-        {/* ── Welcome Banner ─────────────────────────────── */}
-        <View style={styles.banner}>
           <Text style={styles.bannerGreeting}>{getGreeting()}</Text>
           <Text style={styles.bannerTitle}>
             Welcome back,{"\n"}how's your mind{"\n"}today?
@@ -109,38 +106,42 @@ export default function HomeScreen() {
           </Pressable>
         </View>
 
-        {/* ── Daily Mood ─────────────────────────────────── */}
-        <MoodSelector
-          selectedMood={selectedMood}
-          onSelectMood={handleMoodSelect}
-        />
-
-        {/* ── Activities ─────────────────────────────────── */}
-        <Text style={styles.sectionTitle}>Activities</Text>
-        <View style={styles.activitiesRow}>
-          <ActivityCard
-            title="Morning Breathing"
-            subtitle="5 min guided calm"
-            backgroundColor="#FFF3EC"
-            style={styles.activityCardLeft}
+        {/* ── Main Content Container ─────────────────────── */}
+        <View style={styles.mainContent}>
+          {/* ── Daily Mood ─────────────────────────────────── */}
+          <MoodSelector
+            selectedMood={selectedMood}
+            onSelectMood={handleMoodSelect}
+            style={styles.moodSelector}
           />
-          <ActivityCard
-            title="Mood Journal"
-            subtitle="Reflect on your day"
-            backgroundColor="#F0EBE5"
-            style={styles.activityCardRight}
-          />
-        </View>
 
-        {/* ── Quick Tips ─────────────────────────────────── */}
-        <Text style={styles.sectionTitle}>Quick tips</Text>
-        <View style={styles.tipCard}>
-          <Text style={styles.tipEmoji}>💡</Text>
-          <View style={styles.tipContent}>
-            <Text style={styles.tipTitle}>Take a deep breath</Text>
-            <Text style={styles.tipSubtitle}>
-              Pause for a moment. Inhale for 4 seconds, hold for 4, exhale for 6.
-            </Text>
+          {/* ── Activities ─────────────────────────────────── */}
+          <Text style={styles.sectionTitle}>Activities</Text>
+          <View style={styles.activitiesRow}>
+            <ActivityCard
+              title="Morning Breathing"
+              subtitle="5 min guided calm"
+              backgroundColor="#FFF3EC"
+              style={styles.activityCardLeft}
+            />
+            <ActivityCard
+              title="Mood Journal"
+              subtitle="Reflect on your day"
+              backgroundColor="#F0EBE5"
+              style={styles.activityCardRight}
+            />
+          </View>
+
+          {/* ── Quick Tips ─────────────────────────────────── */}
+          <Text style={styles.sectionTitle}>Quick tips</Text>
+          <View style={styles.tipCard}>
+            <Text style={styles.tipEmoji}>💡</Text>
+            <View style={styles.tipContent}>
+              <Text style={styles.tipTitle}>Take a deep breath</Text>
+              <Text style={styles.tipSubtitle}>
+                Pause for a moment. Inhale for 4 seconds, hold for 4, exhale for 6.
+              </Text>
+            </View>
           </View>
         </View>
       </ScrollView>
@@ -157,16 +158,20 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: Colors.background,
   },
-  scrollContent: {
+  
+  /* Top Section */
+  topSection: {
+    backgroundColor: Colors.primaryLight,
     paddingHorizontal: SCREEN_PADDING,
+    paddingBottom: Spacing.xxl,
+    borderBottomLeftRadius: 32,
+    borderBottomRightRadius: 32,
   },
-
-  /* Header */
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: Spacing.lg,
+    marginBottom: Spacing.xl,
   },
   headerLeft: {
     flexDirection: "row",
@@ -176,7 +181,7 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: Colors.primaryLight,
+    backgroundColor: Colors.background,
     alignItems: "center",
     justifyContent: "center",
     marginRight: Spacing.md,
@@ -200,7 +205,7 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: Colors.backgroundSecondary,
+    backgroundColor: Colors.background,
     alignItems: "center",
     justifyContent: "center",
     shadowColor: Colors.shadow,
@@ -210,13 +215,7 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
 
-  /* Banner */
-  banner: {
-    backgroundColor: Colors.primaryLight,
-    borderRadius: BorderRadius.xl,
-    padding: SCREEN_PADDING,
-    marginBottom: Spacing.sm,
-  },
+  /* Banner Text & Search */
   bannerGreeting: {
     fontSize: FontSize.sm,
     color: Colors.textPrimary,
@@ -231,17 +230,24 @@ const styles = StyleSheet.create({
   searchBar: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: Colors.backgroundSecondary,
+    backgroundColor: Colors.background,
     borderRadius: BorderRadius.pill,
-    height: 44,
+    height: 48,
     paddingHorizontal: Spacing.base,
-    alignSelf: "flex-start",
-    minWidth: 160,
+    alignSelf: "stretch", // full width within padding
   },
   searchPlaceholder: {
     fontSize: FontSize.sm,
     color: Colors.textTertiary,
     marginLeft: Spacing.sm,
+  },
+
+  /* Main Content */
+  mainContent: {
+    paddingHorizontal: SCREEN_PADDING,
+  },
+  moodSelector: {
+    marginTop: Spacing.xl,
   },
 
   /* Sections */
