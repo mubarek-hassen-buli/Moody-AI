@@ -9,13 +9,12 @@ import { InsightCard } from "@/components/stats/InsightCard";
 import { Colors } from "@/constants/colors";
 import { Typography } from "@/constants/typography";
 import { Spacing, SCREEN_PADDING } from "@/constants/spacing";
-
-/* ──────────────────────────────────────────────────────────
- * Component
- * ────────────────────────────────────────────────────────── */
+import { useWeeklyMoods, useMoodStats } from "@/hooks/useMood";
 
 export default function StatisticsScreen() {
   const insets = useSafeAreaInsets();
+  const { data: weeklyData, isLoading: weeklyLoading } = useWeeklyMoods();
+  const { data: statsData, isLoading: statsLoading } = useMoodStats();
 
   return (
     <View style={styles.root}>
@@ -28,28 +27,30 @@ export default function StatisticsScreen() {
         ]}
         showsVerticalScrollIndicator={false}
       >
-        {/* ── Page Header ────────────────────────────────── */}
+        {/* ── Page Header ─────────────────────────────────── */}
         <Text style={styles.heading}>Statistics</Text>
-        <Text style={styles.subtitle}>
-          Your weekly emotional wellness overview
-        </Text>
+        <Text style={styles.subtitle}>Your weekly emotional wellness overview</Text>
 
-        {/* ── Mood Line Chart ────────────────────────────── */}
-        <MoodChart style={styles.card} />
+        {/* ── Mood Line Chart ─────────────────────────────── */}
+        <MoodChart
+          style={styles.card}
+          data={weeklyData}
+          loading={weeklyLoading}
+        />
 
-        {/* ── Emotion Donut Breakdown ────────────────────── */}
-        <EmotionBreakdown style={styles.card} />
+        {/* ── Emotion Donut Breakdown ─────────────────────── */}
+        <EmotionBreakdown
+          style={styles.card}
+          data={statsData?.breakdown}
+          loading={statsLoading}
+        />
 
-        {/* ── Recovery Insights ──────────────────────────── */}
+        {/* ── Recovery Insights ───────────────────────────── */}
         <InsightCard style={styles.card} />
       </ScrollView>
     </View>
   );
 }
-
-/* ──────────────────────────────────────────────────────────
- * Styles
- * ────────────────────────────────────────────────────────── */
 
 const styles = StyleSheet.create({
   root: {

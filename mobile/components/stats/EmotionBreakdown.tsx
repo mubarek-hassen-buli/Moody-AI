@@ -4,32 +4,18 @@ import Svg, { Circle as SvgCircle, G } from "react-native-svg";
 import { Colors } from "@/constants/colors";
 import { FontSize, FontWeight } from "@/constants/typography";
 import { BorderRadius, Spacing } from "@/constants/spacing";
+import type { EmotionSegment } from "@/hooks/useMood";
 
 /* ──────────────────────────────────────────────────────────
  * Types
  * ────────────────────────────────────────────────────────── */
 
-interface EmotionSegment {
-  label: string;
-  percentage: number;
-  color: string;
-}
-
 interface EmotionBreakdownProps {
   style?: ViewStyle;
+  /** Emotion segments from the backend. */
+  data?: EmotionSegment[];
+  loading?: boolean;
 }
-
-/* ──────────────────────────────────────────────────────────
- * Mock data
- * ────────────────────────────────────────────────────────── */
-
-const EMOTIONS: EmotionSegment[] = [
-  { label: "Happy", percentage: 35, color: Colors.primary },
-  { label: "Calm", percentage: 25, color: Colors.primaryLight },
-  { label: "Anxious", percentage: 20, color: Colors.warning },
-  { label: "Sad", percentage: 12, color: "#9E9E9E" },
-  { label: "Angry", percentage: 8, color: Colors.error },
-];
 
 /* ──────────────────────────────────────────────────────────
  * Donut chart helpers
@@ -62,67 +48,76 @@ function buildSegments(data: EmotionSegment[]) {
  * Component
  * ────────────────────────────────────────────────────────── */
 
-export const EmotionBreakdown: React.FC<EmotionBreakdownProps> = ({ style }) => {
-  const segments = buildSegments(EMOTIONS);
+export const EmotionBreakdown: React.FC<EmotionBreakdownProps> = ({ style, data, loading }) => {
+  const segments = buildSegments(data ?? []);
+  const topEmotion = data?.[0] ?? null;
 
   return (
     <View style={[styles.container, style]}>
       <Text style={styles.title}>Emotions this week</Text>
       <Text style={styles.subtitle}>Breakdown of your recorded feelings</Text>
 
-      <View style={styles.body}>
-        {/* Donut chart */}
-        <View style={styles.chartContainer}>
-          <Svg width={SIZE} height={SIZE} viewBox={`0 0 ${SIZE} ${SIZE}`}>
-            {/* Background ring */}
-            <SvgCircle
-              cx={CENTER}
-              cy={CENTER}
-              r={RADIUS}
-              stroke={Colors.borderLight}
-              strokeWidth={STROKE_WIDTH}
-              fill="none"
-            />
+      {loading && (
+        <Text style={styles.emptyText}>Loading...</Text>
+      )}
 
-            {/* Data segments */}
-            <G rotation={-90} origin={`${CENTER}, ${CENTER}`}>
-              {segments.map((seg) => (
-                <SvgCircle
-                  key={seg.label}
-                  cx={CENTER}
-                  cy={CENTER}
-                  r={RADIUS}
-                  stroke={seg.color}
-                  strokeWidth={STROKE_WIDTH}
-                  strokeDasharray={seg.dashArray}
-                  strokeDashoffset={seg.dashOffset}
-                  strokeLinecap="round"
-                  fill="none"
-                />
-              ))}
-            </G>
-          </Svg>
+      {!loading && !topEmotion && (
+        <Text style={styles.emptyText}>Log moods to see your emotion breakdown!</Text>
+      )}
 
-          {/* Centre label */}
-          <View style={styles.centerLabel}>
-            <Text style={styles.centerPercentage}>
-              {EMOTIONS[0].percentage}%
-            </Text>
-            <Text style={styles.centerText}>{EMOTIONS[0].label}</Text>
+      {!loading && topEmotion && (
+        <View style={styles.body}>
+          {/* Donut chart */}
+          <View style={styles.chartContainer}>
+            <Svg width={SIZE} height={SIZE} viewBox={`0 0 ${SIZE} ${SIZE}`}>
+              {/* Background ring */}
+              <SvgCircle
+                cx={CENTER}
+                cy={CENTER}
+                r={RADIUS}
+                stroke={Colors.borderLight}
+                strokeWidth={STROKE_WIDTH}
+                fill="none"
+              />
+
+              {/* Data segments */}
+              <G rotation={-90} origin={`${CENTER}, ${CENTER}`}>
+                {segments.map((seg) => (
+                  <SvgCircle
+                    key={seg.label}
+                    cx={CENTER}
+                    cy={CENTER}
+                    r={RADIUS}
+                    stroke={seg.color}
+                    strokeWidth={STROKE_WIDTH}
+                    strokeDasharray={seg.dashArray}
+                    strokeDashoffset={seg.dashOffset}
+                    strokeLinecap="round"
+                    fill="none"
+                  />
+                ))}
+              </G>
+            </Svg>
+
+            {/* Centre label */}
+            <View style={styles.centerLabel}>
+              <Text style={styles.centerPercentage}>{topEmotion.percentage}%</Text>
+              <Text style={styles.centerText}>{topEmotion.label}</Text>
+            </View>
+          </View>
+
+          {/* Legend */}
+          <View style={styles.legend}>
+            {(data ?? []).map((emotion) => (
+              <View key={emotion.label} style={styles.legendItem}>
+                <View style={[styles.legendDot, { backgroundColor: emotion.color }]} />
+                <Text style={styles.legendLabel}>{emotion.label}</Text>
+                <Text style={styles.legendValue}>{emotion.percentage}%</Text>
+              </View>
+            ))}
           </View>
         </View>
-
-        {/* Legend */}
-        <View style={styles.legend}>
-          {EMOTIONS.map((emotion) => (
-            <View key={emotion.label} style={styles.legendItem}>
-              <View style={[styles.legendDot, { backgroundColor: emotion.color }]} />
-              <Text style={styles.legendLabel}>{emotion.label}</Text>
-              <Text style={styles.legendValue}>{emotion.percentage}%</Text>
-            </View>
-          ))}
-        </View>
-      </View>
+      )}
     </View>
   );
 };
@@ -152,6 +147,12 @@ const styles = StyleSheet.create({
     fontSize: FontSize.xs,
     color: Colors.textTertiary,
     marginBottom: Spacing.base,
+  },
+  emptyText: {
+    fontSize: FontSize.sm,
+    color: Colors.textTertiary,
+    textAlign: "center",
+    paddingVertical: Spacing.base,
   },
   body: {
     flexDirection: "row",

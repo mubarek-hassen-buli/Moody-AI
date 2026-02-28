@@ -18,6 +18,7 @@ import { ActivityCard } from "@/components/home/ActivityCard";
 import { Colors } from "@/constants/colors";
 import { Typography, FontSize, FontWeight } from "@/constants/typography";
 import { Spacing, SCREEN_PADDING, BorderRadius } from "@/constants/spacing";
+import { useCreateMood, type MoodLevel } from "@/hooks/useMood";
 
 /* ──────────────────────────────────────────────────────────
  * Inline Icons
@@ -66,10 +67,17 @@ export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const [selectedMood, setSelectedMood] = useState<string | null>(null);
+  const createMood = useCreateMood();
 
   const handleMoodSelect = useCallback((key: string) => {
-    setSelectedMood((prev) => (prev === key ? null : key));
-  }, []);
+    // Toggle off if tapping the same mood
+    if (key === selectedMood) {
+      setSelectedMood(null);
+      return;
+    }
+    setSelectedMood(key);
+    createMood.mutate({ mood: key as MoodLevel });
+  }, [selectedMood, createMood]);
 
   return (
     <View style={styles.root}>
