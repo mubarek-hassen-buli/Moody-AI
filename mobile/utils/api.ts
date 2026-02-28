@@ -1,10 +1,13 @@
 import axios from 'axios';
-import { useAuthStore } from '@/hooks/useAuth';
+import { supabase } from '@/utils/supabase';
 
 /**
  * Pre-configured Axios instance for the Moody-AI NestJS backend.
  *
  * Automatically attaches the Supabase JWT to every request.
+ * Gets the token directly from the Supabase client to avoid
+ * circular dependency with useAuth.
+ *
  * Update `baseURL` to your deployed backend URL when ready.
  */
 const api = axios.create({
@@ -16,8 +19,8 @@ const api = axios.create({
 });
 
 // Request interceptor — attach Supabase access token
-api.interceptors.request.use((config) => {
-  const session = useAuthStore.getState().session;
+api.interceptors.request.use(async (config) => {
+  const { data: { session } } = await supabase.auth.getSession();
   if (session?.access_token) {
     config.headers.Authorization = `Bearer ${session.access_token}`;
   }

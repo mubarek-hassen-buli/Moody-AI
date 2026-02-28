@@ -71,10 +71,6 @@ export default function SignupScreen() {
     // TODO: integrate Google OAuth
   }, []);
 
-  const handleFacebookSignup = useCallback(() => {
-    // TODO: integrate Facebook OAuth
-  }, []);
-
   return (
     <View style={[styles.root, { paddingTop: insets.top }]}>
       <StatusBar style="dark" />
@@ -148,7 +144,6 @@ export default function SignupScreen() {
 
           {/* ── Social buttons ───────────────────────────── */}
           <SocialButton provider="google" onPress={handleGoogleSignup} />
-          <SocialButton provider="facebook" onPress={handleFacebookSignup} />
 
           {/* ── Login link ───────────────────────────────── */}
           <View style={styles.loginLinkContainer}>

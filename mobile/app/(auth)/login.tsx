@@ -65,10 +65,6 @@ export default function LoginScreen() {
     // TODO: integrate Google OAuth
   }, []);
 
-  const handleFacebookLogin = useCallback(() => {
-    // TODO: integrate Facebook OAuth
-  }, []);
-
   return (
     <View style={[styles.root, { paddingTop: insets.top }]}>
       <StatusBar style="dark" />
@@ -136,7 +132,6 @@ export default function LoginScreen() {
 
           {/* ── Social buttons ───────────────────────────── */}
           <SocialButton provider="google" onPress={handleGoogleLogin} />
-          <SocialButton provider="facebook" onPress={handleFacebookLogin} />
 
           {/* ── Privacy policy ────────────────────────────── */}
           <Text style={styles.privacyText}>

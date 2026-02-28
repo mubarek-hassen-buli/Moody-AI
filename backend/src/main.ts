@@ -1,5 +1,5 @@
 import { NestFactory } from '@nestjs/core';
-import { ValidationPipe } from '@nestjs/common';
+import { ZodValidationPipe } from 'nestjs-zod';
 import { AppModule } from './app.module.js';
 
 async function bootstrap() {
@@ -15,14 +15,8 @@ async function bootstrap() {
     allowedHeaders: ['Content-Type', 'Authorization'],
   });
 
-  // Global validation pipe for DTOs
-  app.useGlobalPipes(
-    new ValidationPipe({
-      whitelist: true,
-      forbidNonWhitelisted: true,
-      transform: true,
-    }),
-  );
+  // Global Zod validation pipe
+  app.useGlobalPipes(new ZodValidationPipe());
 
   const port = process.env.PORT ?? 3000;
   await app.listen(port);

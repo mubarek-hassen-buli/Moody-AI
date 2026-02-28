@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { supabase } from '@/utils/supabase';
+import api from '@/utils/api';
 import type { Session, User } from '@supabase/supabase-js';
 
 /* ──────────────────────────────────────────────────────────
@@ -29,79 +30,110 @@ interface AuthState {
  * Store
  * ────────────────────────────────────────────────────────── */
 
-export const useAuthStore = create<AuthState>((set) => ({
-  session: null,
-  user: null,
-  loading: false,
-  initialized: false,
-
-  initialize: async () => {
+export const useAuthStore = create<AuthState>((set) => {
+  /**
+   * Sync the authenticated user to Neon via our backend.
+   * Silently fails — auth still works even if backend is down.
+   */
+  const syncUserToBackend = async () => {
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      set({
-        session,
-        user: session?.user ?? null,
-        initialized: true,
-      });
-
-      // Listen for auth state changes (token refresh, sign out, etc.)
-      supabase.auth.onAuthStateChange((_event, session) => {
-        set({ session, user: session?.user ?? null });
-      });
+      await api.get('/user/me');
     } catch {
-      set({ initialized: true });
+      // Backend sync is best-effort; don't block auth flow
     }
-  },
+  };
 
-  signUp: async (email, password, name) => {
-    set({ loading: true });
-    try {
-      const { data, error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: { name },
-        },
-      });
+  return {
+    session: null,
+    user: null,
+    loading: false,
+    initialized: false,
 
-      if (error) throw error;
+    initialize: async () => {
+      try {
+        // Validate the token against Supabase server, NOT just the local cache.
+        // getUser() makes a real HTTP request to verify the token is still valid.
+        // If the user was deleted in Supabase, this will return an error.
+        const { data: { user }, error } = await supabase.auth.getUser();
 
-      set({
-        session: data.session,
-        user: data.user,
-      });
-    } finally {
-      set({ loading: false });
-    }
-  },
+        if (error || !user) {
+          // Token is invalid or user was deleted — clear everything
+          await supabase.auth.signOut();
+          set({ session: null, user: null, initialized: true });
+          return;
+        }
 
-  signIn: async (email, password) => {
-    set({ loading: true });
-    try {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
+        // Token is valid, get the session for the JWT
+        const { data: { session } } = await supabase.auth.getSession();
+        set({
+          session,
+          user: session?.user ?? null,
+          initialized: true,
+        });
 
-      if (error) throw error;
+        // Listen for auth state changes (token refresh, sign out, etc.)
+        supabase.auth.onAuthStateChange((_event, session) => {
+          set({ session, user: session?.user ?? null });
+        });
+      } catch {
+        set({ session: null, user: null, initialized: true });
+      }
+    },
 
-      set({
-        session: data.session,
-        user: data.user,
-      });
-    } finally {
-      set({ loading: false });
-    }
-  },
+    signUp: async (email, password, name) => {
+      set({ loading: true });
+      try {
+        const { data, error } = await supabase.auth.signUp({
+          email,
+          password,
+          options: {
+            data: { name },
+          },
+        });
 
-  signOut: async () => {
-    set({ loading: true });
-    try {
-      const { error } = await supabase.auth.signOut();
-      if (error) throw error;
-      set({ session: null, user: null });
-    } finally {
-      set({ loading: false });
-    }
-  },
-}));
+        if (error) throw error;
+
+        set({
+          session: data.session,
+          user: data.user,
+        });
+
+        await syncUserToBackend();
+      } finally {
+        set({ loading: false });
+      }
+    },
+
+    signIn: async (email, password) => {
+      set({ loading: true });
+      try {
+        const { data, error } = await supabase.auth.signInWithPassword({
+          email,
+          password,
+        });
+
+        if (error) throw error;
+
+        set({
+          session: data.session,
+          user: data.user,
+        });
+
+        await syncUserToBackend();
+      } finally {
+        set({ loading: false });
+      }
+    },
+
+    signOut: async () => {
+      set({ loading: true });
+      try {
+        const { error } = await supabase.auth.signOut();
+        if (error) throw error;
+        set({ session: null, user: null });
+      } finally {
+        set({ loading: false });
+      }
+    },
+  };
+});
