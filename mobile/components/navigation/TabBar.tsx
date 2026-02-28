@@ -1,5 +1,6 @@
-import React from "react";
+import React, { useState } from "react";
 import { View, Pressable, StyleSheet, Text } from "react-native";
+import { useRouter } from "expo-router";
 import { BottomTabBarProps } from "@react-navigation/bottom-tabs";
 import Animated, {
   useAnimatedStyle,
@@ -14,7 +15,8 @@ import Svg, { Path, Rect, Circle, Defs, RadialGradient, Stop } from "react-nativ
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { Colors } from "@/constants/colors";
-import { Typography } from "@/constants/typography";
+import { Typography, FontSize } from "@/constants/typography";
+import { BorderRadius, Spacing } from "@/constants/spacing";
 
 const AnimatedPath = Animated.createAnimatedComponent(Path);
 
@@ -84,6 +86,8 @@ const INNER_GAP = 8;         // Gap between inner items
 
 export function CustomTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
   const insets = useSafeAreaInsets();
+  const router = useRouter();
+  const [fabMenuVisible, setFabMenuVisible] = useState(false);
   
   // Reanimated shared value for active index
   const activeIndex = useSharedValue(state.index);
@@ -250,21 +254,37 @@ export function CustomTabBar({ state, descriptors, navigation }: BottomTabBarPro
         })}
       </View>
 
-      {/* ── Glowing Floating Action Button (Blue) ─────────── */}
+      {/* ── Floating Action Button (Blue) & Menu ─────────── */}
       <View style={styles.fabContainer}>
-        {/* Custom Glow Layer */}
-        <Svg width={100} height={100} style={styles.fabGlowSvg} pointerEvents="none">
-          <Defs>
-            <RadialGradient id="glow" cx="50%" cy="50%" r="50%" fx="50%" fy="50%">
-              <Stop offset="0%" stopColor={BLUE_BTN} stopOpacity="0.8" />
-              <Stop offset="60%" stopColor={BLUE_BTN} stopOpacity="0.4" />
-              <Stop offset="100%" stopColor={BLUE_BTN} stopOpacity="0" />
-            </RadialGradient>
-          </Defs>
-          <Circle cx="50" cy="50" r="50" fill="url(#glow)" />
-        </Svg>
+        {fabMenuVisible && (
+          <View style={styles.fabMenu}>
+            <Pressable 
+              style={styles.fabMenuItem} 
+              onPress={() => {
+                setFabMenuVisible(false);
+                router.push("/chat" as any);
+              }}
+            >
+              <Text style={styles.fabMenuText}>💬 Chat</Text>
+            </Pressable>
+            <View style={styles.fabMenuDivider} />
+            <Pressable 
+              style={styles.fabMenuItem} 
+              onPress={() => {
+                setFabMenuVisible(false);
+                console.log("Call feature coming later");
+              }}
+            >
+              <Text style={styles.fabMenuText}>📞 Call</Text>
+            </Pressable>
+          </View>
+        )}
         
-        <Pressable style={styles.fab} accessibilityLabel="Create new">
+        <Pressable 
+          style={styles.fab} 
+          accessibilityLabel="Create new"
+          onPress={() => setFabMenuVisible(!fabMenuVisible)}
+        >
           <PlusIcon />
         </Pressable>
       </View>
@@ -342,10 +362,35 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     zIndex: 2,
   },
-  fabGlowSvg: {
+  fabMenu: {
     position: "absolute",
-    top: -22,
-    left: -22,
-    zIndex: 1,
+    bottom: TAB_HEIGHT + 10,
+    right: 0,
+    backgroundColor: "#FFFFFF",
+    borderRadius: BorderRadius.lg,
+    paddingVertical: Spacing.xs,
+    paddingHorizontal: Spacing.sm,
+    shadowColor: Colors.shadow,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 8,
+    zIndex: 10,
+    width: 140,
+  },
+  fabMenuItem: {
+    paddingVertical: Spacing.md,
+    paddingHorizontal: Spacing.sm,
+  },
+  fabMenuDivider: {
+    height: 1,
+    backgroundColor: Colors.border,
+    width: "100%",
+  },
+  fabMenuText: {
+    fontSize: FontSize.md,
+    fontWeight: "500",
+    color: Colors.textPrimary,
+    fontFamily: Typography.fontFamily,
   },
 });
