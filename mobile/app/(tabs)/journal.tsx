@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   FlatList,
   Pressable,
+  RefreshControl,
   StyleSheet,
   Text,
   View,
@@ -35,6 +36,13 @@ export default function JournalScreen() {
   const createJournal = useCreateJournal();
   const updateJournal = useUpdateJournal();
   const deleteJournal = useDeleteJournal();
+  const [refreshing, setRefreshing] = useState(false);
+
+  const handleRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await refetch();
+    setRefreshing(false);
+  }, [refetch]);
 
   // ── Editor modal state ────────────────────────────────────
   const [editorVisible, setEditorVisible] = useState(false);
@@ -143,6 +151,14 @@ export default function JournalScreen() {
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={handleRefresh}
+              tintColor={Colors.primary}
+              colors={[Colors.primary]}
+            />
+          }
           renderItem={({ item }) => (
             <JournalEntryCard
               entry={item}

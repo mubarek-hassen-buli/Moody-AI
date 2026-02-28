@@ -2,7 +2,8 @@ import React, { useEffect, useRef, useState } from "react";
 import {
   Animated,
   Dimensions,
-  KeyboardAvoidingView,
+  Keyboard,
+  KeyboardEvent,
   Modal,
   Platform,
   Pressable,
@@ -31,6 +32,7 @@ interface JournalEditorProps {
 }
 
 const { height: SCREEN_HEIGHT } = Dimensions.get("window");
+const SHEET_HEIGHT = SCREEN_HEIGHT * 0.88;
 
 /* ──────────────────────────────────────────────────────────
  * Component
@@ -45,10 +47,31 @@ export const JournalEditor: React.FC<JournalEditorProps> = ({
 }) => {
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+
   const slideAnim = useRef(new Animated.Value(SCREEN_HEIGHT)).current;
   const contentRef = useRef<TextInput>(null);
 
-  // Populate fields when editing an existing entry
+  /* ── Keyboard tracking ──────────────────────────────────── */
+  // Manually track keyboard height so content stays visible.
+  // KeyboardAvoidingView is unreliable inside absolute-positioned Modals.
+  useEffect(() => {
+    const showEvent = Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow";
+    const hideEvent = Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide";
+
+    const onShow = (e: KeyboardEvent) => setKeyboardHeight(e.endCoordinates.height);
+    const onHide = () => setKeyboardHeight(0);
+
+    const sub1 = Keyboard.addListener(showEvent, onShow);
+    const sub2 = Keyboard.addListener(hideEvent, onHide);
+
+    return () => {
+      sub1.remove();
+      sub2.remove();
+    };
+  }, []);
+
+  /* ── Populate fields when entry changes ─────────────────── */
   useEffect(() => {
     if (entry) {
       setTitle(entry.title);
@@ -59,7 +82,15 @@ export const JournalEditor: React.FC<JournalEditorProps> = ({
     }
   }, [entry]);
 
-  // Slide-in animation
+  /* ── Reset keyboard offset when editor closes ───────────── */
+  useEffect(() => {
+    if (!visible) {
+      setKeyboardHeight(0);
+      Keyboard.dismiss();
+    }
+  }, [visible]);
+
+  /* ── Slide-in/out animation ─────────────────────────────── */
   useEffect(() => {
     if (visible) {
       Animated.spring(slideAnim, {
@@ -77,6 +108,7 @@ export const JournalEditor: React.FC<JournalEditorProps> = ({
     }
   }, [visible]);
 
+  /* ── Derived state ──────────────────────────────────────── */
   const isValid = title.trim().length > 0 && content.trim().length > 0;
   const isEditing = entry !== null;
 
@@ -84,6 +116,10 @@ export const JournalEditor: React.FC<JournalEditorProps> = ({
     if (!isValid || saving) return;
     onSave(title.trim(), content.trim());
   };
+
+  /* ── Scroll content area height accounts for keyboard ────── */
+  // Subtract keyboard height so the input is always above the keyboard.
+  const scrollContentPadding = keyboardHeight > 0 ? keyboardHeight + Spacing.base : Spacing.xl;
 
   return (
     <Modal
@@ -93,73 +129,84 @@ export const JournalEditor: React.FC<JournalEditorProps> = ({
       onRequestClose={onClose}
     >
       {/* Backdrop */}
-      <Pressable style={styles.backdrop} onPress={onClose} />
+      <Pressable
+        style={styles.backdrop}
+        onPress={() => {
+          Keyboard.dismiss();
+          onClose();
+        }}
+      />
 
-      {/* Sheet */}
+      {/* Bottom sheet */}
       <Animated.View
         style={[styles.sheet, { transform: [{ translateY: slideAnim }] }]}
       >
-        <KeyboardAvoidingView
-          behavior={Platform.OS === "ios" ? "padding" : undefined}
-          style={styles.flex}
-        >
-          {/* Header */}
-          <View style={styles.header}>
-            <Pressable onPress={onClose} style={styles.headerButton}>
-              <Text style={styles.cancelText}>Cancel</Text>
-            </Pressable>
-            <Text style={styles.headerTitle}>
-              {isEditing ? "Edit Entry" : "New Entry"}
-            </Text>
-            <Pressable
-              onPress={handleSave}
-              style={[styles.headerButton, (!isValid || saving) && styles.saveButtonDisabled]}
-              disabled={!isValid || saving}
-            >
-              <Text style={[styles.saveText, (!isValid || saving) && styles.saveTextDisabled]}>
-                {saving ? "Saving…" : "Save"}
-              </Text>
-            </Pressable>
-          </View>
+        {/* ── Header ───────────────────────────────────────── */}
+        <View style={styles.header}>
+          <Pressable onPress={() => { Keyboard.dismiss(); onClose(); }} style={styles.headerButton}>
+            <Text style={styles.cancelText}>Cancel</Text>
+          </Pressable>
 
-          {/* Divider */}
-          <View style={styles.divider} />
+          <Text style={styles.headerTitle}>
+            {isEditing ? "Edit Entry" : "New Entry"}
+          </Text>
 
-          {/* Form */}
-          <ScrollView
-            style={styles.body}
-            keyboardShouldPersistTaps="handled"
-            showsVerticalScrollIndicator={false}
+          <Pressable
+            onPress={handleSave}
+            style={styles.headerButton}
+            disabled={!isValid || saving}
           >
-            <TextInput
-              style={styles.titleInput}
-              placeholder="Entry title…"
-              placeholderTextColor={Colors.textTertiary}
-              value={title}
-              onChangeText={setTitle}
-              maxLength={200}
-              returnKeyType="next"
-              onSubmitEditing={() => contentRef.current?.focus()}
-            />
+            <Text style={[styles.saveText, (!isValid || saving) && styles.saveTextDisabled]}>
+              {saving ? "Saving…" : "Save"}
+            </Text>
+          </Pressable>
+        </View>
 
-            <View style={styles.contentDivider} />
+        <View style={styles.divider} />
 
-            <TextInput
-              ref={contentRef}
-              style={styles.contentInput}
-              placeholder="Write your thoughts…"
-              placeholderTextColor={Colors.textTertiary}
-              value={content}
-              onChangeText={setContent}
-              multiline
-              textAlignVertical="top"
-              maxLength={10000}
-            />
-          </ScrollView>
+        {/* ── Scrollable form ────────────────────────────────
+         *   paddingBottom grows with the keyboard so the focused
+         *   input is never hidden behind it.
+         * ──────────────────────────────────────────────────── */}
+        <ScrollView
+          style={styles.body}
+          contentContainerStyle={{ paddingBottom: scrollContentPadding }}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="none"
+          showsVerticalScrollIndicator={false}
+          automaticallyAdjustKeyboardInsets
+        >
+          <TextInput
+            style={styles.titleInput}
+            placeholder="Entry title…"
+            placeholderTextColor={Colors.textTertiary}
+            value={title}
+            onChangeText={setTitle}
+            maxLength={200}
+            returnKeyType="next"
+            onSubmitEditing={() => contentRef.current?.focus()}
+          />
 
-          {/* Character count */}
+          <View style={styles.contentDivider} />
+
+          <TextInput
+            ref={contentRef}
+            style={styles.contentInput}
+            placeholder="Write your thoughts…"
+            placeholderTextColor={Colors.textTertiary}
+            value={content}
+            onChangeText={setContent}
+            multiline
+            scrollEnabled={false}   // let the outer ScrollView scroll
+            textAlignVertical="top"
+            maxLength={10000}
+          />
+        </ScrollView>
+
+        {/* ── Footer: char count (hidden when keyboard is up) ── */}
+        {keyboardHeight === 0 && (
           <Text style={styles.charCount}>{content.length} / 10,000</Text>
-        </KeyboardAvoidingView>
+        )}
       </Animated.View>
     </Modal>
   );
@@ -179,14 +226,11 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    height: SCREEN_HEIGHT * 0.88,
+    height: SHEET_HEIGHT,
     backgroundColor: Colors.backgroundSecondary,
     borderTopLeftRadius: BorderRadius.xl,
     borderTopRightRadius: BorderRadius.xl,
     overflow: "hidden",
-  },
-  flex: {
-    flex: 1,
   },
   header: {
     flexDirection: "row",
@@ -220,9 +264,6 @@ const styles = StyleSheet.create({
   saveTextDisabled: {
     color: Colors.textTertiary,
   },
-  saveButtonDisabled: {
-    opacity: 0.6,
-  },
   divider: {
     height: 1,
     backgroundColor: Colors.borderLight,
@@ -230,7 +271,6 @@ const styles = StyleSheet.create({
   body: {
     flex: 1,
     paddingHorizontal: Spacing.base,
-    paddingTop: Spacing.sm,
   },
   titleInput: {
     fontSize: FontSize.xl,
@@ -238,7 +278,7 @@ const styles = StyleSheet.create({
     color: Colors.textPrimary,
     fontFamily: Typography.fontFamily,
     paddingVertical: Spacing.sm,
-    minHeight: 44,
+    minHeight: 48,
   },
   contentDivider: {
     height: 1,
@@ -251,7 +291,7 @@ const styles = StyleSheet.create({
     fontFamily: Typography.fontFamily,
     lineHeight: 24,
     paddingVertical: Spacing.sm,
-    minHeight: 300,
+    minHeight: 200,
   },
   charCount: {
     fontSize: FontSize.xs,
