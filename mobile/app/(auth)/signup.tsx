@@ -1,5 +1,6 @@
 import React, { useState, useCallback } from "react";
 import {
+  Alert,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -52,14 +53,19 @@ export default function SignupScreen() {
     email.trim().length > 0 &&
     password.trim().length >= 6;
 
-  const handleCreateAccount = useCallback(() => {
-    // TODO: integrate with backend signup & validation
+  const handleCreateAccount = useCallback(async () => {
+    if (!isFormValid) return;
     setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
+    try {
+      const { useAuthStore } = await import("@/hooks/useAuth");
+      await useAuthStore.getState().signUp(email.trim(), password, fullName.trim());
       router.replace("/(tabs)" as any);
-    }, 800);
-  }, [router]);
+    } catch (error: any) {
+      Alert.alert("Sign Up Failed", error?.message ?? "Something went wrong.");
+    } finally {
+      setLoading(false);
+    }
+  }, [fullName, email, password, isFormValid, router]);
 
   const handleGoogleSignup = useCallback(() => {
     // TODO: integrate Google OAuth

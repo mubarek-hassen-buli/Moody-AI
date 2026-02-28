@@ -1,5 +1,6 @@
 import React, { useState, useCallback } from "react";
 import {
+  Alert,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -43,16 +44,22 @@ export default function LoginScreen() {
   const insets = useSafeAreaInsets();
 
   const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const handleConnect = useCallback(() => {
-    // TODO: integrate with backend auth & validation
+  const handleConnect = useCallback(async () => {
+    if (!email.trim() || !password.trim()) return;
     setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
+    try {
+      const { useAuthStore } = await import("@/hooks/useAuth");
+      await useAuthStore.getState().signIn(email.trim(), password);
       router.replace("/(tabs)" as any);
-    }, 800);
-  }, [router]);
+    } catch (error: any) {
+      Alert.alert("Login Failed", error?.message ?? "Please check your credentials.");
+    } finally {
+      setLoading(false);
+    }
+  }, [email, password, router]);
 
   const handleGoogleLogin = useCallback(() => {
     // TODO: integrate Google OAuth
@@ -103,7 +110,16 @@ export default function LoginScreen() {
             onChangeText={setEmail}
             keyboardType="email-address"
             autoCapitalize="none"
-            helperText="We will send you an e-mail with a login link."
+            style={styles.inputSection}
+          />
+
+          {/* ── Password input ────────────────────────────── */}
+          <TextInput
+            label="Password"
+            placeholder="Your password"
+            value={password}
+            onChangeText={setPassword}
+            secureTextEntry
             style={styles.inputSection}
           />
 
@@ -112,7 +128,7 @@ export default function LoginScreen() {
             label="Connect"
             onPress={handleConnect}
             loading={loading}
-            disabled={email.trim().length === 0}
+            disabled={email.trim().length === 0 || password.trim().length < 6}
           />
 
           {/* ── Divider ──────────────────────────────────── */}
