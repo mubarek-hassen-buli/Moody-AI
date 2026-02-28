@@ -1,7 +1,7 @@
 import React from "react";
 import { View, StyleSheet, Text, Pressable, Image, Dimensions } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useRouter } from "expo-router";
+import { useRouter, useLocalSearchParams } from "expo-router";
 import Svg, { Path, Rect } from "react-native-svg";
 import { Colors } from "@/constants/colors";
 import { Typography, FontSize, FontWeight } from "@/constants/typography";
@@ -47,9 +47,11 @@ const WAVEFORM_BARS = [
 ];
 const CURRENT_PROGRESS_INDEX = 12; // Everything before this is "played"
 
-export default function BreathingActivityScreen() {
+export default function AudioPlayerScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const params = useLocalSearchParams<{ id?: string, title?: string }>();
+  const displayTitle = params.title || "Morning Breathing";
 
   // Draw the progress arc hugging the top of our curved background
   // R = 300, W = 600, we just want a simple top curve arc
@@ -66,7 +68,7 @@ export default function BreathingActivityScreen() {
         <Pressable style={styles.backButton} onPress={() => router.back()}>
           <BackIcon />
         </Pressable>
-        <Text style={styles.headerTitle}>Morning Breathing</Text>
+        <Text style={styles.headerTitle}>{displayTitle}</Text>
         <View style={styles.backButtonPlaceholder} />
       </View>
 

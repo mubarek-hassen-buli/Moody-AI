@@ -119,23 +119,34 @@ export default function HomeScreen() {
           />
 
           {/* ── Activities ─────────────────────────────────── */}
-          <Text style={styles.sectionTitle}>Activities</Text>
-          <View style={styles.activitiesRow}>
-            <ActivityCard
-              title="Morning Breathing"
-              subtitle="5 min guided calm"
-              backgroundColor="#FFF3EC"
-              style={styles.activityCardLeft}
-              onPress={() => router.push("/breathing" as any)}
-            />
-            <ActivityCard
-              title="Mood Journal"
-              subtitle="Reflect on your day"
-              backgroundColor="#F0EBE5"
-              style={styles.activityCardRight}
-              onPress={() => router.navigate("/(tabs)/journal" as any)}
-            />
-          </View>
+        <Text style={styles.sectionTitle}>Activities</Text>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.activitiesRow}
+        >
+          <ActivityCard
+            title="Relaxing Audios"
+            subtitle="Calm your mind"
+            backgroundColor="#FFF3EC"
+            style={{ width: 160 }}
+            onPress={() => router.push("/relaxing-audios" as any)}
+          />
+          <ActivityCard
+            title="Dance Workout"
+            subtitle="Get your body moving"
+            backgroundColor="#EAF1F0"
+            style={{ width: 160 }}
+            onPress={() => router.push("/dance-workouts" as any)}
+          />
+          <ActivityCard
+            title="Mood Journal"
+            subtitle="Reflect on your day"
+            backgroundColor="#F0EBE5"
+            style={{ width: 160 }}
+            onPress={() => router.navigate("/(tabs)/journal" as any)}
+          />
+        </ScrollView>
 
           {/* ── Quick Tips ─────────────────────────────────── */}
           <Text style={styles.sectionTitle}>Quick tips</Text>
