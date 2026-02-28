@@ -13,6 +13,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { JournalEntryCard } from "@/components/journal/JournalEntryCard";
 import { JournalEditor } from "@/components/journal/JournalEditor";
+import { CustomDeleteModal } from "@/components/journal/CustomDeleteModal";
 import { Colors } from "@/constants/colors";
 import { Typography, FontSize, FontWeight } from "@/constants/typography";
 import { Spacing, SCREEN_PADDING } from "@/constants/spacing";
@@ -48,6 +49,10 @@ export default function JournalScreen() {
   const [editorVisible, setEditorVisible] = useState(false);
   const [editingEntry, setEditingEntry] = useState<JournalEntry | null>(null);
 
+  // ── Delete modal state ────────────────────────────────────
+  const [deleteModalVisible, setDeleteModalVisible] = useState(false);
+  const [deletingEntry, setDeletingEntry] = useState<JournalEntry | null>(null);
+
   /* ── Handlers ──────────────────────────────────────────── */
 
   const handleNewEntry = useCallback(() => {
@@ -82,12 +87,26 @@ export default function JournalScreen() {
     [editingEntry, createJournal, updateJournal, handleCloseEditor],
   );
 
-  const handleDelete = useCallback(
-    (id: string) => {
-      deleteJournal.mutate(id);
-    },
-    [deleteJournal],
-  );
+  const handleDeleteRequest = useCallback((entry: JournalEntry) => {
+    setDeletingEntry(entry);
+    setDeleteModalVisible(true);
+  }, []);
+
+  const handleCancelDelete = useCallback(() => {
+    setDeleteModalVisible(false);
+    setDeletingEntry(null);
+  }, []);
+
+  const handleConfirmDelete = useCallback(() => {
+    if (deletingEntry) {
+      deleteJournal.mutate(deletingEntry.id, {
+        onSuccess: () => {
+          setDeleteModalVisible(false);
+          setDeletingEntry(null);
+        },
+      });
+    }
+  }, [deletingEntry, deleteJournal]);
 
   /* ── Render ────────────────────────────────────────────── */
 
@@ -163,7 +182,7 @@ export default function JournalScreen() {
             <JournalEntryCard
               entry={item}
               onEdit={handleEditEntry}
-              onDelete={handleDelete}
+              onDelete={handleDeleteRequest}
               style={styles.card}
             />
           )}
@@ -177,6 +196,14 @@ export default function JournalScreen() {
         saving={isSaving}
         onSave={handleSave}
         onClose={handleCloseEditor}
+      />
+
+      {/* ── Delete confirmation modal ─────────────────────── */}
+      <CustomDeleteModal
+        visible={deleteModalVisible}
+        dateString={deletingEntry ? deletingEntry.createdAt.slice(0, 10).replace(/-/g, "/") : ""}
+        onCancel={handleCancelDelete}
+        onConfirm={handleConfirmDelete}
       />
     </View>
   );

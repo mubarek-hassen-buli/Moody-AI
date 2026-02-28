@@ -1,6 +1,5 @@
 import React, { useCallback } from "react";
 import {
-  Alert,
   Pressable,
   StyleSheet,
   Text,
@@ -37,7 +36,7 @@ function truncate(text: string, maxLength: number): string {
 interface JournalEntryCardProps {
   entry: JournalEntry;
   onEdit: (entry: JournalEntry) => void;
-  onDelete: (id: string) => void;
+  onDelete: (entry: JournalEntry) => void;
   style?: ViewStyle;
 }
 
@@ -51,20 +50,6 @@ export const JournalEntryCard: React.FC<JournalEntryCardProps> = ({
   onDelete,
   style,
 }) => {
-  const handleDelete = useCallback(() => {
-    Alert.alert(
-      "Delete Entry",
-      "Are you sure you want to delete this entry? This cannot be undone.",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Delete",
-          style: "destructive",
-          onPress: () => onDelete(entry.id),
-        },
-      ],
-    );
-  }, [entry.id, onDelete]);
 
   return (
     <Pressable
@@ -92,7 +77,7 @@ export const JournalEntryCard: React.FC<JournalEntryCardProps> = ({
 
       {/* Delete button */}
       <Pressable
-        onPress={handleDelete}
+        onPress={() => onDelete(entry)}
         hitSlop={12}
         style={styles.deleteButton}
         accessibilityRole="button"
