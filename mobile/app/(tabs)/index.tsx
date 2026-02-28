@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useEffect } from "react";
 import {
   Image,
   Pressable,
@@ -10,10 +10,11 @@ import {
 import { StatusBar } from "expo-status-bar";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Svg, { Path, Circle } from "react-native-svg";
+import * as SecureStore from "expo-secure-store";
 
 import { useRouter } from "expo-router";
 
-import { MoodSelector } from "@/components/home/MoodSelector";
+import { MoodSelector, type MoodSelectorState } from "@/components/home/MoodSelector";
 import { ActivityCard } from "@/components/home/ActivityCard";
 import { Colors } from "@/constants/colors";
 import { Typography, FontSize, FontWeight } from "@/constants/typography";
@@ -60,6 +61,16 @@ function getGreeting(): string {
 }
 
 /* ──────────────────────────────────────────────────────────
+ * Storage key for daily mood persistence
+ * ────────────────────────────────────────────────────────── */
+
+const MOOD_DATE_KEY = 'moody_daily_mood_date';
+
+function getTodayDateString(): string {
+  return new Date().toISOString().slice(0, 10); // e.g. "2026-02-28"
+}
+
+/* ──────────────────────────────────────────────────────────
  * Component
  * ────────────────────────────────────────────────────────── */
 
@@ -67,17 +78,50 @@ export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const [selectedMood, setSelectedMood] = useState<string | null>(null);
+  const [selectorState, setSelectorState] = useState<MoodSelectorState>('idle');
   const createMood = useCreateMood();
 
+  // On mount: check if the user already logged a mood today
+  useEffect(() => {
+    SecureStore.getItemAsync(MOOD_DATE_KEY).then((stored) => {
+      if (stored) {
+        const { date, mood } = JSON.parse(stored);
+        if (date === getTodayDateString()) {
+          setSelectedMood(mood);
+          setSelectorState('confirmed');
+        }
+      }
+    });
+  }, []);
+
   const handleMoodSelect = useCallback((key: string) => {
-    // Toggle off if tapping the same mood
-    if (key === selectedMood) {
-      setSelectedMood(null);
-      return;
-    }
+    // If already confirmed, don't allow re-selection
+    if (selectorState === 'confirmed') return;
+
+    // Cancel any in-flight mutation before starting a new one
+    createMood.reset();
     setSelectedMood(key);
-    createMood.mutate({ mood: key as MoodLevel });
-  }, [selectedMood, createMood]);
+    setSelectorState('pending');
+
+    createMood.mutate(
+      { mood: key as MoodLevel },
+      {
+        onSuccess: async () => {
+          // Persist today's date + mood choice so the banner survives a restart
+          await SecureStore.setItemAsync(
+            MOOD_DATE_KEY,
+            JSON.stringify({ date: getTodayDateString(), mood: key }),
+          );
+          setSelectorState('confirmed');
+        },
+        onError: () => {
+          // API failed — let the user try again
+          setSelectorState('idle');
+          setSelectedMood(null);
+        },
+      },
+    );
+  }, [selectorState, createMood]);
 
   return (
     <View style={styles.root}>
@@ -122,6 +166,7 @@ export default function HomeScreen() {
           {/* ── Daily Mood ─────────────────────────────────── */}
           <MoodSelector
             selectedMood={selectedMood}
+            selectorState={selectorState}
             onSelectMood={handleMoodSelect}
             style={styles.moodSelector}
           />
