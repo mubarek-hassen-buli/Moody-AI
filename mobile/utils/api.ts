@@ -11,7 +11,10 @@ import { supabase } from '@/utils/supabase';
  * Update `baseURL` to your deployed backend URL when ready.
  */
 const api = axios.create({
-  baseURL: 'http://localhost:3000/api',
+  // On Android `localhost` resolves to the device itself, not your PC.
+  // Use your machine's LAN IP for local development.
+  // Set EXPO_PUBLIC_API_URL in .env to override (e.g. for production).
+  baseURL: process.env.EXPO_PUBLIC_API_URL ?? 'http://192.168.9.32:3000/api',
   timeout: 15000,
   headers: {
     'Content-Type': 'application/json',
