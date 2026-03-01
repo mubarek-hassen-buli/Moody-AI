@@ -4,6 +4,7 @@ import { DRIZZLE } from '../../core/database/database.module.js';
 import { users } from '../../core/database/schema.js';
 import type { NeonHttpDatabase } from 'drizzle-orm/neon-http';
 import type * as schema from '../../core/database/schema.js';
+import { UpdateProfileDto } from './dto/update-profile.dto.js';
 
 @Injectable()
 export class UserService {
@@ -55,5 +56,24 @@ export class UserService {
       .limit(1);
 
     return result[0] ?? null;
+  }
+
+  /**
+   * Update a user's display name.
+   */
+  async updateName(supabaseId: string, dto: UpdateProfileDto) {
+    const existing = await this.findBySupabaseId(supabaseId);
+    if (!existing) throw new Error('User not found');
+
+    const [updated] = await this.db
+      .update(users)
+      .set({
+        ...(dto.name !== undefined && { name: dto.name }),
+        updatedAt: new Date(),
+      })
+      .where(eq(users.supabaseId, supabaseId))
+      .returning();
+
+    return updated;
   }
 }

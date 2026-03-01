@@ -25,7 +25,7 @@ const AnimatedPath = Animated.createAnimatedComponent(Path);
  * ────────────────────────────────────────────────────────── */
 
 const HomeIcon = ({ color }: { color: string }) => (
-  <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
+  <Svg width={18} height={18} viewBox="0 0 24 24" fill="none">
     <Path d="M4 10V20C4 21.1046 4.89543 22 6 22H18C19.1046 22 20 21.1046 20 20V10" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
     <Path d="M22 12L12 3L2 12" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
     <Rect x="10" y="14" width="4" height="8" fill={color} />
@@ -33,7 +33,7 @@ const HomeIcon = ({ color }: { color: string }) => (
 );
 
 const InsightsIcon = ({ color }: { color: string }) => (
-  <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
+  <Svg width={18} height={18} viewBox="0 0 24 24" fill="none">
     <Rect x="3" y="4" width="18" height="16" rx="3" stroke={color} strokeWidth={2} strokeLinecap="round" />
     <Circle cx="8" cy="10" r="1.5" fill={color} />
     <Circle cx="8" cy="16" r="1.5" fill={color} />
@@ -41,8 +41,8 @@ const InsightsIcon = ({ color }: { color: string }) => (
   </Svg>
 );
 
-const ChatIcon = ({ color }: { color: string }) => (
-  <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
+const JournalIcon = ({ color }: { color: string }) => (
+  <Svg width={18} height={18} viewBox="0 0 24 24" fill="none">
     <Path d="M21 11.5C21 16.1944 16.9706 20 12 20C10.61 20 9.29415 19.6644 8.12586 19.0664L3 20.5L4.69749 16.0354C3.6262 14.7336 3 13.1788 3 11.5C3 6.80558 7.02944 3 12 3C16.9706 3 21 6.80558 21 11.5Z" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
     <Circle cx="8" cy="11.5" r="1.5" fill={color} />
     <Circle cx="12" cy="11.5" r="1.5" fill={color} />
@@ -50,143 +50,152 @@ const ChatIcon = ({ color }: { color: string }) => (
   </Svg>
 );
 
+const ProfileIcon = ({ color }: { color: string }) => (
+  <Svg width={18} height={18} viewBox="0 0 24 24" fill="none">
+    <Circle cx={12} cy={8} r={4} stroke={color} strokeWidth={2} />
+    <Path d="M4 20c0-4 3.58-7 8-7s8 3 8 7" stroke={color} strokeWidth={2} strokeLinecap="round" />
+  </Svg>
+);
+
 const PlusIcon = () => (
-  <Svg width={24} height={24} viewBox="0 0 24 24" fill="none">
+  <Svg width={22} height={22} viewBox="0 0 24 24" fill="none">
     <Path d="M12 5V19M5 12H19" stroke="#FFF" strokeWidth={2.5} strokeLinecap="round" />
   </Svg>
 );
 
 /* ──────────────────────────────────────────────────────────
- * Constants & Colors
+ * Constants
  * ────────────────────────────────────────────────────────── */
 
-// Standardize route to icon mapping
 const TAB_ICONS: Record<string, (props: { color: string }) => React.JSX.Element> = {
   index: HomeIcon,
+  journal: JournalIcon,
   statistics: InsightsIcon,
-  journal: ChatIcon,
+  profile: ProfileIcon,
 };
 
-const BG_DARK = "#252525";    // Outer gooey container
-const ITEM_BG = "#3D3D3D";    // Inner pill/circle background
-const TEXT_ACTIVE = "#FFFFFF";
-const ICON_INACTIVE = "#A0A0A0";
-const ICON_ACTIVE = "#FFFFFF";
-const BLUE_BTN = "#2B8CFF";
+const TAB_LABELS: Record<string, string> = {
+  index: "Home",
+  journal: "Journal",
+  statistics: "Insights",
+  profile: "Profile",
+};
 
-// Layout metrics
-const TAB_HEIGHT = 64;       // Outer container height
-const ICON_SIZE = 48;        // Inner item height (and width when inactive)
-const EXPANDED_WIDTH = 110;  // Inner item width when active
-const INNER_GAP = 8;         // Gap between inner items
+const BG_DARK    = "#252525";
+const ITEM_BG    = "#3D3D3D";
+const ICON_INACTIVE = "#A0A0A0";
+const ICON_ACTIVE   = "#FFFFFF";
+const BLUE_BTN   = "#2B8CFF";
+const TEXT_ACTIVE = "#FFFFFF";
+
+// Sizing — tuned for 4 tabs on the narrowest supported device
+const TAB_HEIGHT       = 60;
+const ICON_SIZE        = 44;   // square icon area
+const EXPANDED_WIDTH   = 88;   // width of the active pill
+const INNER_GAP        = 5;    // gap between pills
+const SEGMENT_WIDTH    = 278;  // total width of the gooey container
 
 /* ──────────────────────────────────────────────────────────
- * Custom Tab Bar
+ * CustomTabBar
  * ────────────────────────────────────────────────────────── */
 
 export function CustomTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
-  const insets = useSafeAreaInsets();
-  const router = useRouter();
-  const [fabMenuVisible, setFabMenuVisible] = useState(false);
-  
-  // Reanimated shared value for active index
+  const insets     = useSafeAreaInsets();
+  const router     = useRouter();
+  const [fabOpen, setFabOpen] = useState(false);
+
   const activeIndex = useSharedValue(state.index);
 
   React.useEffect(() => {
-    activeIndex.value = withSpring(state.index, { damping: 14, stiffness: 120, mass: 0.8 });
+    activeIndex.value = withSpring(state.index, {
+      damping: 14, stiffness: 120, mass: 0.8,
+    });
   }, [state.index, activeIndex]);
 
-  // Derived Values for Inner Item Positions & Widths
-  const items = [0, 1, 2].map((i) => {
-    return useDerivedValue(() => {
-      // Widths
-      const w0 = interpolate(activeIndex.value, [0, 1, 2], [EXPANDED_WIDTH, ICON_SIZE, ICON_SIZE]);
-      const w1 = interpolate(activeIndex.value, [0, 1, 2], [ICON_SIZE, EXPANDED_WIDTH, ICON_SIZE]);
-      const w2 = interpolate(activeIndex.value, [0, 1, 2], [ICON_SIZE, ICON_SIZE, EXPANDED_WIDTH]);
+  /* ── Derived item widths and positions ─────────────────── */
 
-      // X positions
-      const x0 = 8;
-      const x1 = x0 + w0 + INNER_GAP;
-      const x2 = x1 + w1 + INNER_GAP;
+  const NUM_TABS = 4;
 
-      const widths = [w0, w1, w2];
-      const positions = [x0, x1, x2];
+  // For each tab, compute its animated width & left position
+  const tabItems = Array.from({ length: NUM_TABS }, (_, i) =>
+    useDerivedValue(() => {
+      // Widths for all 4 tabs at each active index
+      const inputRange  = [0, 1, 2, 3];
+      const widths = [0, 1, 2, 3].map((j) =>
+        j === i ? EXPANDED_WIDTH : ICON_SIZE
+      );
+      const w = interpolate(activeIndex.value, inputRange, widths);
 
-      return { w: widths[i], x: positions[i] };
-    });
-  });
+      // Compute positions left-to-right from width sequence
+      const allWidths = [0, 1, 2, 3].map((j) => {
+        const out = [0, 1, 2, 3].map((k) => k === j ? EXPANDED_WIDTH : ICON_SIZE);
+        return interpolate(activeIndex.value, inputRange, out);
+      });
 
-  // Animated gooey background SVG Path
+      let x = 8; // left padding
+      for (let k = 0; k < i; k++) {
+        x += allWidths[k] + INNER_GAP;
+      }
+
+      return { w, x };
+    })
+  );
+
+  /* ── Animated gooey background ─────────────────────────── */
+
   const animatedProps = useAnimatedProps(() => {
-    const w0 = interpolate(activeIndex.value, [0, 1, 2], [EXPANDED_WIDTH, ICON_SIZE, ICON_SIZE]);
-    const w1 = interpolate(activeIndex.value, [0, 1, 2], [ICON_SIZE, EXPANDED_WIDTH, ICON_SIZE]);
-    const w2 = interpolate(activeIndex.value, [0, 1, 2], [ICON_SIZE, ICON_SIZE, EXPANDED_WIDTH]);
+    const inp = [0, 1, 2, 3];
+    const W = [0, 1, 2, 3].map((j) => {
+      const out = [0, 1, 2, 3].map((k) => (k === j ? EXPANDED_WIDTH : ICON_SIZE));
+      return interpolate(activeIndex.value, inp, out);
+    });
 
-    const x0 = 8;
-    const x1 = x0 + w0 + INNER_GAP;
-    const x2 = x1 + w1 + INNER_GAP;
+    // Left edges of each pill
+    const X: number[] = [];
+    X[0] = 8;
+    X[1] = X[0] + W[0] + INNER_GAP;
+    X[2] = X[1] + W[1] + INNER_GAP;
+    X[3] = X[2] + W[2] + INNER_GAP;
 
-    // Outer hulls
-    const ox0 = x0 - 8;
-    const orx0 = ox0 + w0 + 16;
-    const ox1 = x1 - 8;
-    const orx1 = ox1 + w1 + 16;
-    const ox2 = x2 - 8;
-    const orx2 = ox2 + w2 + 16;
+    // Outer hull edges (outer 8px padding)
+    const OL = X.map((x) => x - 8);
+    const OR = X.map((x, i) => x - 8 + W[i] + 16);
 
-    const gap = -8; // Overlap for the gooey effect
     const h = TAB_HEIGHT;
-    const r = 32;
-    const dip = 6; // Depth of the concavity between items
+    const r = 30;
+    const dip = 5;
+    const gap = -8;
 
-    // Top bridge 0 -> 1
-    const t0_P0 = orx0 - 16;
-    const t0_M = orx0 + gap / 2;
-    const t0_P3 = ox1 + 16;
-    const t0_C1 = `C ${t0_P0 + 8},0 ${t0_M - 4},${dip} ${t0_M},${dip}`;
-    const t0_C2 = `C ${t0_M + 4},${dip} ${t0_P3 - 8},0 ${t0_P3},0`;
+    // Helper: top bridge between pill i and i+1
+    const topBridge = (i: number) => {
+      const p0 = OR[i] - 14;
+      const mid = OR[i] + gap / 2;
+      const p3 = OL[i + 1] + 14;
+      return `L ${p0},0 C ${p0 + 7},0 ${mid - 4},${dip} ${mid},${dip} C ${mid + 4},${dip} ${p3 - 7},0 ${p3},0`;
+    };
 
-    // Top bridge 1 -> 2
-    const t1_P0 = orx1 - 16;
-    const t1_M = orx1 + gap / 2;
-    const t1_P3 = ox2 + 16;
-    const t1_C1 = `C ${t1_P0 + 8},0 ${t1_M - 4},${dip} ${t1_M},${dip}`;
-    const t1_C2 = `C ${t1_M + 4},${dip} ${t1_P3 - 8},0 ${t1_P3},0`;
-
-    // Bottom bridge 2 -> 1 (drawn right to left)
-    const b1_P0 = ox2 + 16;
-    const b1_M = orx1 + gap / 2;
-    const b1_P3 = orx1 - 16;
-    const b1_C1 = `C ${b1_P0 - 8},${h} ${b1_M + 4},${h - dip} ${b1_M},${h - dip}`;
-    const b1_C2 = `C ${b1_M - 4},${h - dip} ${b1_P3 + 8},${h} ${b1_P3},${h}`;
-
-    // Bottom bridge 1 -> 0
-    const b0_P0 = ox1 + 16;
-    const b0_M = orx0 + gap / 2;
-    const b0_P3 = orx0 - 16;
-    const b0_C1 = `C ${b0_P0 - 8},${h} ${b0_M + 4},${h - dip} ${b0_M},${h - dip}`;
-    const b0_C2 = `C ${b0_M - 4},${h - dip} ${b0_P3 + 8},${h} ${b0_P3},${h}`;
+    // Helper: bottom bridge between pill i+1 and i (right-to-left)
+    const botBridge = (i: number) => {
+      const p0 = OL[i + 1] + 14;
+      const mid = OR[i] + gap / 2;
+      const p3 = OR[i] - 14;
+      return `L ${p0},${h} C ${p0 - 7},${h} ${mid + 4},${h - dip} ${mid},${h - dip} C ${mid - 4},${h - dip} ${p3 + 7},${h} ${p3},${h}`;
+    };
 
     const d = `
-      M ${ox0 + r},0
-      L ${t0_P0},0
-      ${t0_C1}
-      ${t0_C2}
-      L ${t1_P0},0
-      ${t1_C1}
-      ${t1_C2}
-      L ${orx2 - r},0
-      A ${r},${r} 0 0,1 ${orx2},${r}
-      A ${r},${r} 0 0,1 ${orx2 - r},${h}
-      L ${b1_P0},${h}
-      ${b1_C1}
-      ${b1_C2}
-      L ${b0_P0},${h}
-      ${b0_C1}
-      ${b0_C2}
-      L ${ox0 + r},${h}
-      A ${r},${r} 0 0,1 ${ox0},${h - r}
-      A ${r},${r} 0 0,1 ${ox0 + r},0
+      M ${OL[0] + r},0
+      ${topBridge(0)}
+      ${topBridge(1)}
+      ${topBridge(2)}
+      L ${OR[3] - r},0
+      A ${r},${r} 0 0,1 ${OR[3]},${r}
+      A ${r},${r} 0 0,1 ${OR[3] - r},${h}
+      ${botBridge(2)}
+      ${botBridge(1)}
+      ${botBridge(0)}
+      L ${OL[0] + r},${h}
+      A ${r},${r} 0 0,1 ${OL[0]},${h - r}
+      A ${r},${r} 0 0,1 ${OL[0] + r},0
       Z
     `;
     return { d };
@@ -194,58 +203,59 @@ export function CustomTabBar({ state, descriptors, navigation }: BottomTabBarPro
 
   return (
     <View style={[styles.wrapper, { bottom: insets.bottom > 0 ? insets.bottom : 20 }]}>
-      
-      {/* ── Grouped Gooey Tabs ────────────────────────────── */}
+
+      {/* ── Gooey 4-tab segment ──────────────────────────────── */}
       <View style={styles.segmentContainer}>
-        {/* The SVG Morphing Web Background */}
-        <Svg width={300} height={TAB_HEIGHT} style={StyleSheet.absoluteFill}>
+        <Svg
+          width={SEGMENT_WIDTH}
+          height={TAB_HEIGHT}
+          style={StyleSheet.absoluteFill}
+        >
           <AnimatedPath animatedProps={animatedProps} fill={BG_DARK} />
         </Svg>
 
-        {/* The Inner Absolute Items */}
         {state.routes.map((route, index) => {
-          if (route.name === "profile") return null;
-
-          // Override label for journal to match design perfectly
-          let label = "Home";
-          if (route.name === "statistics") label = "Insights";
-          if (route.name === "journal") label = "AI Chat";
-
+          const label    = TAB_LABELS[route.name] ?? route.name;
           const isFocused = state.index === index;
-          const Icon = TAB_ICONS[route.name] || HomeIcon;
-          
+          const Icon     = TAB_ICONS[route.name] ?? HomeIcon;
+
           const onPress = () => {
-            const event = navigation.emit({ type: "tabPress", target: route.key, canPreventDefault: true });
-            if (!isFocused && !event.defaultPrevented) navigation.navigate(route.name);
+            const event = navigation.emit({
+              type: "tabPress",
+              target: route.key,
+              canPreventDefault: true,
+            });
+            if (!isFocused && !event.defaultPrevented) {
+              navigation.navigate(route.name);
+            }
           };
 
-          const itemAnimatedStyle = useAnimatedStyle(() => ({
-            width: items[index].value.w,
-            left: items[index].value.x,
+          const itemStyle = useAnimatedStyle(() => ({
+            width: tabItems[index].value.w,
+            left: tabItems[index].value.x,
           }));
 
-          const textAnimatedStyle = useAnimatedStyle(() => {
-             const progress = interpolate(activeIndex.value,
-               [index - 1, index, index + 1],
-               [-1, 1, -1],
-               "clamp"
-             );
-             // When this index is active, progress = 1.
-             // When inactive, progress = -1.
-             const isActiveFloat = Math.max(0, progress); // 1 when active, 0 otherwise
-
-             const opacity = withTiming(isActiveFloat > 0.5 ? 1 : 0, { duration: 200 });
-             const translateX = interpolate(isActiveFloat, [0, 1], [-10, 0]);
-             return { opacity, transform: [{ translateX }] };
+          const textStyle = useAnimatedStyle(() => {
+            const progress = interpolate(
+              activeIndex.value,
+              [index - 1, index, index + 1],
+              [-1, 1, -1],
+              "clamp"
+            );
+            const isActive = Math.max(0, progress);
+            return {
+              opacity: withTiming(isActive > 0.5 ? 1 : 0, { duration: 200 }),
+              transform: [{ translateX: interpolate(isActive, [0, 1], [-8, 0]) }],
+            };
           });
 
           return (
-            <Animated.View key={route.key} style={[styles.tabItem, itemAnimatedStyle]}>
+            <Animated.View key={route.key} style={[styles.tabItem, itemStyle]}>
               <Pressable onPress={onPress} style={styles.pressableFill}>
                 <View style={styles.iconWrapper}>
                   <Icon color={isFocused ? ICON_ACTIVE : ICON_INACTIVE} />
                 </View>
-                <Animated.View style={[styles.labelWrapper, textAnimatedStyle]} pointerEvents="none">
+                <Animated.View style={[styles.labelWrapper, textStyle]} pointerEvents="none">
                   <Text style={styles.labelText} numberOfLines={1}>{label}</Text>
                 </Animated.View>
               </Pressable>
@@ -254,41 +264,34 @@ export function CustomTabBar({ state, descriptors, navigation }: BottomTabBarPro
         })}
       </View>
 
-      {/* ── Floating Action Button (Blue) & Menu ─────────── */}
+      {/* ── Floating Action Button ────────────────────────────── */}
       <View style={styles.fabContainer}>
-        {fabMenuVisible && (
+        {fabOpen && (
           <View style={styles.fabMenu}>
-            <Pressable 
-              style={styles.fabMenuItem} 
-              onPress={() => {
-                setFabMenuVisible(false);
-                router.push("/chat" as any);
-              }}
+            <Pressable
+              style={styles.fabMenuItem}
+              onPress={() => { setFabOpen(false); router.push("/chat" as any); }}
             >
               <Text style={styles.fabMenuText}>💬 Chat</Text>
             </Pressable>
             <View style={styles.fabMenuDivider} />
-            <Pressable 
-              style={styles.fabMenuItem} 
-              onPress={() => {
-                setFabMenuVisible(false);
-                console.log("Call feature coming later");
-              }}
+            <Pressable
+              style={styles.fabMenuItem}
+              onPress={() => { setFabOpen(false); }}
             >
               <Text style={styles.fabMenuText}>📞 Call</Text>
             </Pressable>
           </View>
         )}
-        
-        <Pressable 
-          style={styles.fab} 
-          accessibilityLabel="Create new"
-          onPress={() => setFabMenuVisible(!fabMenuVisible)}
+        <Pressable
+          style={styles.fab}
+          accessibilityLabel="Open action menu"
+          onPress={() => setFabOpen(!fabOpen)}
         >
           <PlusIcon />
         </Pressable>
       </View>
-      
+
     </View>
   );
 }
@@ -307,7 +310,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
   },
   segmentContainer: {
-    width: 260, // Total outer width for 3 items
+    width: SEGMENT_WIDTH,
     height: TAB_HEIGHT,
     position: "relative",
   },
@@ -342,7 +345,7 @@ const styles = StyleSheet.create({
   },
   labelText: {
     color: TEXT_ACTIVE,
-    fontSize: 16,
+    fontSize: 13,
     fontWeight: "500",
     fontFamily: Typography.fontFamily,
   },
@@ -370,7 +373,7 @@ const styles = StyleSheet.create({
     borderRadius: BorderRadius.lg,
     paddingVertical: Spacing.xs,
     paddingHorizontal: Spacing.sm,
-    shadowColor: Colors.shadow,
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.15,
     shadowRadius: 12,
