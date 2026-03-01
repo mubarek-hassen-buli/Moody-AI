@@ -1,28 +1,28 @@
-import React, { useState } from "react";
-import { View, Text, StyleSheet, Pressable, TextInput, ScrollView, KeyboardAvoidingView, Platform } from "react-native";
+import React, { useCallback, useEffect, useRef, useState } from "react";
+import {
+  ActivityIndicator,
+  FlatList,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
-import Svg, { Path } from "react-native-svg";
+import Svg, { Path, Circle } from "react-native-svg";
+
 import { Colors } from "@/constants/colors";
 import { Typography, FontSize, FontWeight } from "@/constants/typography";
 import { Spacing, BorderRadius } from "@/constants/spacing";
-
-/* ──────────────────────────────────────────────────────────
- * Types & Mock Data
- * ────────────────────────────────────────────────────────── */
-interface Message {
-  id: string;
-  text: string;
-  sender: "ai" | "user";
-}
-
-const INITIAL_MESSAGES: Message[] = [
-  { id: "1", text: "Hello! I'm Moody-AI. How are you feeling right now?", sender: "ai" },
-];
+import { useChatHistory, useSendMessage, type ChatMessage } from "@/hooks/useChat";
 
 /* ──────────────────────────────────────────────────────────
  * Icons
  * ────────────────────────────────────────────────────────── */
+
 const BackIcon = () => (
   <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
     <Path d="M15 18L9 12L15 6" stroke={Colors.textPrimary} strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" />
@@ -36,82 +36,150 @@ const SendIcon = () => (
 );
 
 /* ──────────────────────────────────────────────────────────
+ * Typing indicator — three bouncing dots
+ * ────────────────────────────────────────────────────────── */
+
+const TypingIndicator: React.FC = () => (
+  <View style={styles.typingBubble}>
+    {[0, 1, 2].map((i) => (
+      <View key={i} style={[styles.typingDot, { opacity: 0.3 + i * 0.2 }]} />
+    ))}
+    <Text style={styles.typingText}>Moody is thinking…</Text>
+  </View>
+);
+
+/* ──────────────────────────────────────────────────────────
+ * Helper
+ * ────────────────────────────────────────────────────────── */
+
+const INITIAL_GREETING: ChatMessage = {
+  id: "greeting",
+  content: "Hello! I'm Moody, your AI wellness companion. How are you feeling right now?",
+  role: "ai",
+  createdAt: new Date().toISOString(),
+};
+
+/* ──────────────────────────────────────────────────────────
  * Component
  * ────────────────────────────────────────────────────────── */
+
 export default function ChatScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const [messages, setMessages] = useState<Message[]>(INITIAL_MESSAGES);
+  const flatListRef = useRef<FlatList<ChatMessage>>(null);
+
   const [inputText, setInputText] = useState("");
 
-  const handleSend = () => {
-    if (!inputText.trim()) return;
+  // ── Data ─────────────────────────────────────────────────
+  const { data: history, isLoading: historyLoading } = useChatHistory();
+  const { mutate: sendMessage, isPending: isSending } = useSendMessage();
 
-    // Add user message
-    const userMsg: Message = { id: Date.now().toString(), text: inputText.trim(), sender: "user" };
-    setMessages(prev => [...prev, userMsg]);
+  // Prepend greeting before any history messages
+  const messages: ChatMessage[] = [
+    INITIAL_GREETING,
+    ...(history ?? []),
+  ];
+
+  // ── Auto-scroll on new message ───────────────────────────
+  useEffect(() => {
+    if (messages.length > 1) {
+      setTimeout(() => {
+        flatListRef.current?.scrollToEnd({ animated: true });
+      }, 100);
+    }
+  }, [messages.length]);
+
+  // ── Send ─────────────────────────────────────────────────
+  const handleSend = useCallback(() => {
+    const text = inputText.trim();
+    if (!text || isSending) return;
     setInputText("");
+    sendMessage(text);
+  }, [inputText, isSending, sendMessage]);
 
-    // Mock AI response
-    setTimeout(() => {
-      const aiReply: Message = { id: (Date.now() + 1).toString(), text: "I'm here to listen. Tell me more about that.", sender: "ai" };
-      setMessages(prev => [...prev, aiReply]);
-    }, 1000);
-  };
+  // ── Render message bubble ────────────────────────────────
+  const renderMessage = useCallback(({ item }: { item: ChatMessage }) => {
+    const isAI = item.role === "ai";
+    return (
+      <View style={[styles.messageBubble, isAI ? styles.aiBubble : styles.userBubble]}>
+        <Text style={[styles.messageText, isAI ? styles.aiText : styles.userText]}>
+          {item.content}
+        </Text>
+      </View>
+    );
+  }, []);
 
   return (
-    <KeyboardAvoidingView 
-      style={styles.root} 
-      behavior={Platform.OS === "ios" ? "padding" : undefined}
+    <KeyboardAvoidingView
+      style={styles.root}
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+      keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 24}
     >
-      {/* ── Header ─────────────────────────────────────────── */}
+      {/* ── Header ──────────────────────────────────────────── */}
       <View style={[styles.header, { paddingTop: insets.top + Spacing.sm }]}>
-        <Pressable style={styles.backButton} onPress={() => router.back()}>
+        <Pressable
+          style={styles.backButton}
+          onPress={() => router.back()}
+          accessibilityRole="button"
+          accessibilityLabel="Go back"
+        >
           <BackIcon />
         </Pressable>
-        <Text style={styles.headerTitle}>AI Companion</Text>
+
+        <View style={styles.headerCenter}>
+          {/* AI Avatar dot */}
+          <View style={styles.avatarDot} />
+          <Text style={styles.headerTitle}>AI Companion</Text>
+        </View>
+
         <View style={styles.backButtonPlaceholder} />
       </View>
 
-      {/* ── Message List ─────────────────────────────────────── */}
-      <ScrollView 
-        contentContainerStyle={styles.messageList}
-        showsVerticalScrollIndicator={false}
-      >
-        {messages.map((msg) => {
-          const isAI = msg.sender === "ai";
-          return (
-            <View 
-              key={msg.id} 
-              style={[
-                styles.messageBubble, 
-                isAI ? styles.aiBubble : styles.userBubble
-              ]}
-            >
-              <Text style={[styles.messageText, isAI ? styles.aiText : styles.userText]}>
-                {msg.text}
-              </Text>
-            </View>
-          );
-        })}
-      </ScrollView>
+      {/* ── Message List ────────────────────────────────────── */}
+      {historyLoading ? (
+        <View style={styles.centered}>
+          <ActivityIndicator size="large" color={Colors.primary} />
+        </View>
+      ) : (
+        <FlatList
+          ref={flatListRef}
+          data={messages}
+          keyExtractor={(item) => item.id}
+          renderItem={renderMessage}
+          contentContainerStyle={styles.messageList}
+          showsVerticalScrollIndicator={false}
+          onLayout={() => flatListRef.current?.scrollToEnd({ animated: false })}
+          ListFooterComponent={isSending ? <TypingIndicator /> : null}
+        />
+      )}
 
-      {/* ── Input Area ─────────────────────────────────────── */}
+      {/* ── Input Area ──────────────────────────────────────── */}
       <View style={[styles.inputContainer, { paddingBottom: Math.max(insets.bottom, Spacing.md) }]}>
         <TextInput
           style={styles.inputField}
-          placeholder="Message Moody-AI..."
+          placeholder="Message Moody…"
           placeholderTextColor={Colors.textTertiary}
           value={inputText}
           onChangeText={setInputText}
           multiline
+          maxLength={2000}
+          editable={!isSending}
+          returnKeyType="send"
+          onSubmitEditing={handleSend}
+          blurOnSubmit={false}
         />
-        <Pressable 
-          style={[styles.sendButton, !inputText.trim() && styles.sendButtonDisabled]}
+        <Pressable
+          style={[styles.sendButton, (!inputText.trim() || isSending) && styles.sendButtonDisabled]}
           onPress={handleSend}
-          disabled={!inputText.trim()}
+          disabled={!inputText.trim() || isSending}
+          accessibilityRole="button"
+          accessibilityLabel="Send message"
         >
-          <SendIcon />
+          {isSending ? (
+            <ActivityIndicator size="small" color="#FFF" />
+          ) : (
+            <SendIcon />
+          )}
         </Pressable>
       </View>
     </KeyboardAvoidingView>
@@ -121,11 +189,14 @@ export default function ChatScreen() {
 /* ──────────────────────────────────────────────────────────
  * Styles
  * ────────────────────────────────────────────────────────── */
+
 const styles = StyleSheet.create({
   root: {
     flex: 1,
     backgroundColor: Colors.background,
   },
+
+  /* Header */
   header: {
     flexDirection: "row",
     alignItems: "center",
@@ -144,8 +215,17 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  backButtonPlaceholder: {
-    width: 44,
+  backButtonPlaceholder: { width: 44 },
+  headerCenter: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.sm,
+  },
+  avatarDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: "#4ADE80", // green pulse — "online"
   },
   headerTitle: {
     fontSize: FontSize.lg,
@@ -153,21 +233,34 @@ const styles = StyleSheet.create({
     color: Colors.textPrimary,
     fontFamily: Typography.fontFamily,
   },
+
+  /* Messages */
+  centered: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
   messageList: {
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.lg,
     gap: Spacing.sm,
+    paddingBottom: Spacing.xl,
   },
   messageBubble: {
-    maxWidth: "80%",
+    maxWidth: "82%",
     paddingHorizontal: Spacing.lg,
     paddingVertical: Spacing.md,
     borderRadius: BorderRadius.lg,
   },
   aiBubble: {
     alignSelf: "flex-start",
-    backgroundColor: Colors.backgroundSecondary,
+    backgroundColor: Colors.card,
     borderBottomLeftRadius: 4,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 1,
   },
   userBubble: {
     alignSelf: "flex-end",
@@ -179,13 +272,41 @@ const styles = StyleSheet.create({
     lineHeight: 22,
     fontFamily: Typography.fontFamily,
   },
-  aiText: {
-    color: Colors.textPrimary,
+  aiText: { color: Colors.textPrimary },
+  userText: { color: Colors.textPrimary, fontWeight: "500" },
+
+  /* Typing indicator */
+  typingBubble: {
+    flexDirection: "row",
+    alignItems: "center",
+    alignSelf: "flex-start",
+    backgroundColor: Colors.card,
+    borderRadius: BorderRadius.lg,
+    borderBottomLeftRadius: 4,
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.md,
+    gap: Spacing.xs,
+    marginTop: Spacing.sm,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 1,
   },
-  userText: {
-    color: Colors.textPrimary,
-    fontWeight: "500",
+  typingDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: Colors.primary,
   },
+  typingText: {
+    fontSize: FontSize.xs,
+    color: Colors.textTertiary,
+    fontFamily: Typography.fontFamily,
+    marginLeft: Spacing.xs,
+  },
+
+  /* Input */
   inputContainer: {
     flexDirection: "row",
     alignItems: "flex-end",
@@ -194,17 +315,17 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.background,
     borderTopWidth: 1,
     borderTopColor: Colors.border,
+    gap: Spacing.sm,
   },
   inputField: {
     flex: 1,
     minHeight: 44,
     maxHeight: 120,
-    backgroundColor: Colors.backgroundSecondary,
+    backgroundColor: Colors.card,
     borderRadius: 22,
-    paddingHorizontal: Spacing.md,
+    paddingHorizontal: Spacing.base,
     paddingTop: 12,
     paddingBottom: 12,
-    marginRight: Spacing.sm,
     fontSize: FontSize.md,
     color: Colors.textPrimary,
     fontFamily: Typography.fontFamily,
@@ -216,8 +337,13 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.primary,
     alignItems: "center",
     justifyContent: "center",
+    shadowColor: Colors.primary,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.4,
+    shadowRadius: 6,
+    elevation: 3,
   },
   sendButtonDisabled: {
-    opacity: 0.5,
+    opacity: 0.45,
   },
 });
