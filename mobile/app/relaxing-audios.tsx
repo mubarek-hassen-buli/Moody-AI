@@ -1,20 +1,55 @@
 import React from "react";
-import { AudioList, AudioTrack } from "@/components/home/AudioList";
-
-const MOCK_TRACKS: AudioTrack[] = [
-  { id: "r1", title: "Deep Sleep River", duration: "45:00", author: "Dr. Lilian" },
-  { id: "r2", title: "Morning Calm", duration: "10:00", author: "Moody-AI Originals" },
-  { id: "r3", title: "Anxiety Relief", duration: "15:00", author: "Sarah Jenkins" },
-  { id: "r4", title: "Focus Forest", duration: "60:00", author: "Moody-AI Originals" },
-  { id: "r5", title: "Evening Wind Down", duration: "20:00", author: "Dr. Lilian" },
-];
+import { ActivityIndicator, View, StyleSheet, Text } from "react-native";
+import { AudioList } from "@/components/home/AudioList";
+import { useAudioByCategory } from "@/hooks/useAudio";
+import { Colors } from "@/constants/colors";
 
 export default function RelaxingAudiosScreen() {
+  const { data: tracks, isLoading, isError } = useAudioByCategory("relaxing");
+
+  if (isLoading) {
+    return (
+      <View style={styles.centered}>
+        <ActivityIndicator size="large" color={Colors.primary} />
+      </View>
+    );
+  }
+
+  if (isError || !tracks) {
+    return (
+      <View style={styles.centered}>
+        <Text style={styles.errorText}>Could not load audio tracks.</Text>
+      </View>
+    );
+  }
+
+  // Map from API shape to the shape AudioList expects
+  const mapped = tracks.map((t) => ({
+    id: t.id,
+    title: t.title,
+    duration: t.duration,
+    author: "",          // Author intentionally omitted per product decision
+    audioUrl: t.audioUrl,
+  }));
+
   return (
-    <AudioList 
-      title="Relaxing Audios" 
-      subtitle="Calm your mind and reset" 
-      tracks={MOCK_TRACKS} 
+    <AudioList
+      title="Relaxing Audios"
+      subtitle="Calm your mind and reset"
+      tracks={mapped}
     />
   );
 }
+
+const styles = StyleSheet.create({
+  centered: {
+    flex: 1,
+    backgroundColor: Colors.background,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  errorText: {
+    color: Colors.textSecondary,
+    fontSize: 14,
+  },
+});

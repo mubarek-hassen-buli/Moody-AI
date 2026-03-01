@@ -1,10 +1,20 @@
-import React from "react";
-import { View, StyleSheet, Text, Pressable, Image, Dimensions } from "react-native";
+import React, { useCallback, useEffect, useRef, useState } from "react";
+import {
+  Dimensions,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter, useLocalSearchParams } from "expo-router";
+import { Image } from "react-native";
 import Svg, { Path, Rect } from "react-native-svg";
+import { Audio, AVPlaybackStatus } from "expo-av";
+
 import { Colors } from "@/constants/colors";
 import { Typography, FontSize, FontWeight } from "@/constants/typography";
+import { Spacing } from "@/constants/spacing";
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 
@@ -18,120 +28,269 @@ const BackIcon = () => (
   </Svg>
 );
 
-const PlayPauseIcon = () => (
-  <Svg width={24} height={24} viewBox="0 0 24 24" fill="none">
-    <Rect x="8" y="6" width="3" height="12" rx="1.5" fill="#FFF" />
-    <Rect x="13" y="6" width="3" height="12" rx="1.5" fill="#FFF" />
+const PlayIcon = () => (
+  <Svg width={26} height={26} viewBox="0 0 24 24" fill="none">
+    <Path d="M8 5v14l11-7z" fill="#FFF" />
+  </Svg>
+);
+
+const PauseIcon = () => (
+  <Svg width={26} height={26} viewBox="0 0 24 24" fill="none">
+    <Rect x="6" y="5" width="4" height="14" rx="1.5" fill="#FFF" />
+    <Rect x="14" y="5" width="4" height="14" rx="1.5" fill="#FFF" />
   </Svg>
 );
 
 const SkipBackIcon = () => (
   <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
     <Path d="M19 20L9 12L19 4V20Z" fill={Colors.textSecondary} />
-    <Rect x="5" y="4" width="2" height="16" fill={Colors.textSecondary} />
+    <Rect x="5" y="4" width="2" height="16" rx="1" fill={Colors.textSecondary} />
   </Svg>
 );
 
 const SkipForwardIcon = () => (
   <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
     <Path d="M5 4L15 12L5 20V4Z" fill={Colors.textSecondary} />
-    <Rect x="17" y="4" width="2" height="16" fill={Colors.textSecondary} />
+    <Rect x="17" y="4" width="2" height="16" rx="1" fill={Colors.textSecondary} />
   </Svg>
 );
 
 /* ──────────────────────────────────────────────────────────
- * Audio Waveform Mock
+ * Helpers
  * ────────────────────────────────────────────────────────── */
-const WAVEFORM_BARS = [
-  3, 5, 4, 7, 5, 8, 10, 8, 12, 10, 14, 11, 8, 10, 6, 8, 10, 12, 10, 7, 5, 4, 3
-];
-const CURRENT_PROGRESS_INDEX = 12; // Everything before this is "played"
+
+/** Convert milliseconds → "M:SS" string */
+function msToTime(ms: number): string {
+  const totalSeconds = Math.floor(ms / 1000);
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${minutes}:${seconds.toString().padStart(2, "0")}`;
+}
+
+/* ──────────────────────────────────────────────────────────
+ * Waveform mock bars
+ * ────────────────────────────────────────────────────────── */
+
+const WAVEFORM_BARS = [3, 5, 4, 7, 5, 8, 10, 8, 12, 10, 14, 11, 8, 10, 6, 8, 10, 12, 10, 7, 5, 4, 3];
+
+/* ──────────────────────────────────────────────────────────
+ * Component
+ * ────────────────────────────────────────────────────────── */
 
 export default function AudioPlayerScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const params = useLocalSearchParams<{ id?: string, title?: string }>();
-  const displayTitle = params.title || "Morning Breathing";
+  const params = useLocalSearchParams<{
+    id?: string;
+    title?: string;
+    duration?: string;
+    audioUrl?: string;
+  }>();
 
-  // Draw the progress arc hugging the top of our curved background
-  // R = 300, W = 600, we just want a simple top curve arc
-  const arcRadius = 290;
-  const cx = SCREEN_WIDTH / 2;
-  const cy = 300; // Center of the huge circle
-  // We'll just define a generic arc path scaled to screen width
+  const displayTitle = params.title ?? "Audio Session";
+  const audioUrl = params.audioUrl ?? "";
+
+  // ── Playback state ─────────────────────────────────────
+  const soundRef = useRef<Audio.Sound | null>(null);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [isLoaded, setIsLoaded] = useState(false);
+  const [positionMs, setPositionMs] = useState(0);
+  const [durationMs, setDurationMs] = useState(0);
+
+  /* ── Load audio on mount ─────────────────────────────── */
+  useEffect(() => {
+    if (!audioUrl) return;
+
+    let sound: Audio.Sound | null = null;
+
+    const load = async () => {
+      try {
+        // Allow audio to play in silent / background mode
+        await Audio.setAudioModeAsync({
+          allowsRecordingIOS: false,
+          staysActiveInBackground: true,
+          playsInSilentModeIOS: true,
+          shouldDuckAndroid: true,
+        });
+
+        const { sound: loaded } = await Audio.Sound.createAsync(
+          { uri: audioUrl },
+          { shouldPlay: false },
+          (status: AVPlaybackStatus) => {
+            if (!status.isLoaded) return;
+            setPositionMs(status.positionMillis ?? 0);
+            setDurationMs(status.durationMillis ?? 0);
+            setIsPlaying(status.isPlaying);
+            if (status.didJustFinish) {
+              setIsPlaying(false);
+              setPositionMs(0);
+            }
+          },
+        );
+
+        sound = loaded;
+        soundRef.current = loaded;
+        setIsLoaded(true);
+      } catch (e) {
+        console.warn("[AudioPlayer] Failed to load audio:", e);
+      }
+    };
+
+    load();
+
+    // Unload when leaving screen
+    return () => {
+      sound?.unloadAsync();
+      soundRef.current = null;
+    };
+  }, [audioUrl]);
+
+  /* ── Playback controls ───────────────────────────────── */
+
+  const togglePlayPause = useCallback(async () => {
+    if (!soundRef.current || !isLoaded) return;
+    if (isPlaying) {
+      await soundRef.current.pauseAsync();
+    } else {
+      await soundRef.current.playAsync();
+    }
+  }, [isPlaying, isLoaded]);
+
+  const handleSkipBack = useCallback(async () => {
+    if (!soundRef.current || !isLoaded) return;
+    const target = Math.max(0, positionMs - 15_000); // −15 s
+    await soundRef.current.setPositionAsync(target);
+  }, [positionMs, isLoaded]);
+
+  const handleSkipForward = useCallback(async () => {
+    if (!soundRef.current || !isLoaded || !durationMs) return;
+    const target = Math.min(durationMs, positionMs + 15_000); // +15 s
+    await soundRef.current.setPositionAsync(target);
+  }, [positionMs, durationMs, isLoaded]);
+
+  /* ── Progress calculations ───────────────────────────── */
+
+  const progress = durationMs > 0 ? positionMs / durationMs : 0;
+  const playedBars = Math.floor(progress * WAVEFORM_BARS.length);
+
   const arcData = `M 40,80 Q ${SCREEN_WIDTH / 2},-20 ${SCREEN_WIDTH - 40},80`;
+  const progressX = 40 + (SCREEN_WIDTH - 80) * progress;
+  const controlY = 80 - Math.sin(Math.PI * progress) * 100; // approximation
+  const arcProgress = `M 40,80 Q ${SCREEN_WIDTH / 2},-20 ${progressX},${controlY}`;
+
+  /* ── Render ──────────────────────────────────────────── */
 
   return (
     <View style={styles.root}>
-      {/* ── Header ─────────────────────────────────────────── */}
+      {/* ── Header ───────────────────────────────────────── */}
       <View style={[styles.header, { paddingTop: insets.top + 16 }]}>
-        <Pressable style={styles.backButton} onPress={() => router.back()}>
+        <Pressable
+          style={styles.backButton}
+          onPress={() => router.back()}
+          accessibilityRole="button"
+          accessibilityLabel="Go back"
+        >
           <BackIcon />
         </Pressable>
-        <Text style={styles.headerTitle}>{displayTitle}</Text>
+        <Text style={styles.headerTitle} numberOfLines={1}>
+          {displayTitle}
+        </Text>
         <View style={styles.backButtonPlaceholder} />
       </View>
 
-      {/* ── Illustration ─────────────────────────────────────── */}
+      {/* ── Illustration ─────────────────────────────────── */}
       <View style={styles.imageContainer}>
         <Image
-          // Replace with the required yoga image
           source={require("@/assets/images/yoga.jpg")}
           style={styles.illustration}
           resizeMode="cover"
         />
       </View>
 
-      {/* ── Player Bottom Container ──────────────────────────── */}
+      {/* ── Bottom player sheet ───────────────────────────── */}
       <View style={styles.bottomSheetWrapper}>
         <View style={styles.hugeCircleBackground} />
 
-        {/* Arc Progress (mocked as an SVG) */}
+        {/* Progress arc */}
         <View style={styles.arcContainer}>
           <Svg width={SCREEN_WIDTH} height={120}>
-            {/* Background Arch */}
-            <Path d={arcData} stroke={Colors.card} strokeWidth={8} fill="none" strokeLinecap="round" />
-            {/* Progress Arch - darker part */}
-            <Path d={`M 40,80 Q ${SCREEN_WIDTH / 2},-20 ${SCREEN_WIDTH / 2 + 20},15`} stroke={Colors.textPrimary} strokeWidth={8} fill="none" strokeLinecap="round" />
+            {/* Background track */}
+            <Path
+              d={arcData}
+              stroke={Colors.card}
+              strokeWidth={8}
+              fill="none"
+              strokeLinecap="round"
+            />
+            {/* Progress fill */}
+            {durationMs > 0 && (
+              <Path
+                d={arcProgress}
+                stroke={Colors.primary}
+                strokeWidth={8}
+                fill="none"
+                strokeLinecap="round"
+              />
+            )}
           </Svg>
         </View>
 
         <View style={styles.playerContent}>
-          {/* Timer Pill */}
+          {/* Live timer */}
           <View style={styles.timerPill}>
-            <Text style={styles.timerText}>04:35</Text>
+            <Text style={styles.timerText}>
+              {msToTime(positionMs)}
+            </Text>
           </View>
 
           {/* Waveform */}
           <View style={styles.waveformContainer}>
-            {WAVEFORM_BARS.map((heightMultiplier, idx) => {
-              const played = idx <= CURRENT_PROGRESS_INDEX;
-              return (
-                <View
-                  key={idx}
-                  style={[
-                    styles.waveformBar,
-                    { height: heightMultiplier * 4 },
-                    played ? styles.barPlayed : styles.barUnplayed
-                  ]}
-                />
-              );
-            })}
+            {WAVEFORM_BARS.map((mult, idx) => (
+              <View
+                key={idx}
+                style={[
+                  styles.waveformBar,
+                  { height: mult * 4 },
+                  idx <= playedBars ? styles.barPlayed : styles.barUnplayed,
+                ]}
+              />
+            ))}
           </View>
+
+          {/* Time labels */}
           <View style={styles.timeLabelsRow}>
-            <Text style={styles.timeLabel}>2.25</Text>
-            <Text style={styles.timeLabel}>4:35</Text>
+            <Text style={styles.timeLabel}>{msToTime(positionMs)}</Text>
+            <Text style={styles.timeLabel}>
+              {durationMs > 0 ? msToTime(durationMs) : params.duration ?? "--"}
+            </Text>
           </View>
 
           {/* Controls */}
           <View style={styles.controlsRow}>
-            <Pressable style={styles.secondaryButton}>
+            <Pressable
+              style={styles.secondaryButton}
+              onPress={handleSkipBack}
+              accessibilityRole="button"
+              accessibilityLabel="Rewind 15 seconds"
+            >
               <SkipBackIcon />
             </Pressable>
-            <Pressable style={styles.playButton}>
-              <PlayPauseIcon />
+
+            <Pressable
+              style={[styles.playButton, !isLoaded && styles.playButtonDisabled]}
+              onPress={togglePlayPause}
+              accessibilityRole="button"
+              accessibilityLabel={isPlaying ? "Pause" : "Play"}
+            >
+              {isPlaying ? <PauseIcon /> : <PlayIcon />}
             </Pressable>
-            <Pressable style={styles.secondaryButton}>
+
+            <Pressable
+              style={styles.secondaryButton}
+              onPress={handleSkipForward}
+              accessibilityRole="button"
+              accessibilityLabel="Skip 15 seconds"
+            >
               <SkipForwardIcon />
             </Pressable>
           </View>
@@ -148,7 +307,7 @@ export default function AudioPlayerScreen() {
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: Colors.background, // Match Moody-AI soft beige
+    backgroundColor: Colors.background,
   },
   header: {
     flexDirection: "row",
@@ -162,7 +321,7 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: Colors.card,
     alignItems: "center",
     justifyContent: "center",
     shadowColor: "#000",
@@ -171,35 +330,30 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 2,
   },
-  backButtonPlaceholder: {
-    width: 44,
-  },
+  backButtonPlaceholder: { width: 44 },
   headerTitle: {
+    flex: 1,
     fontSize: FontSize.lg,
     fontWeight: FontWeight.bold,
     color: Colors.textPrimary,
     fontFamily: Typography.fontFamily,
+    textAlign: "center",
+    marginHorizontal: Spacing.sm,
   },
   imageContainer: {
-    alignItems: "center",
-    justifyContent: "center",
-    // Takes up the top chunk
-    height: SCREEN_HEIGHT * 0.45,
-    marginTop: -20, // Let it bleed up behind header slightly
+    height: SCREEN_HEIGHT * 0.42,
+    marginTop: -20,
   },
   illustration: {
-    width: '100%',
-    height: '100%',
-    opacity: 0.95, // slight fade to blend with beige
+    width: "100%",
+    height: "100%",
+    opacity: 0.95,
   },
-
-  // The massive curved bottom sheet
   bottomSheetWrapper: {
     flex: 1,
     alignItems: "center",
     width: "100%",
     position: "relative",
-    // Overlap the image slightly
     marginTop: -40,
   },
   hugeCircleBackground: {
@@ -208,24 +362,23 @@ const styles = StyleSheet.create({
     width: 1000,
     height: 1000,
     borderRadius: 500,
-    backgroundColor: Colors.primaryLight, // Using our soft palette color (#FFF3EC etc)
+    backgroundColor: Colors.primaryLight,
   },
   arcContainer: {
     position: "absolute",
     top: 20,
     left: 0,
     right: 0,
-    alignItems: "center",
   },
   playerContent: {
     width: "100%",
     alignItems: "center",
-    paddingTop: 85, // Push down below arc
+    paddingTop: 85,
     paddingHorizontal: 30,
     zIndex: 2,
   },
   timerPill: {
-    backgroundColor: "#FFFFFF",
+    backgroundColor: Colors.card,
     paddingHorizontal: 20,
     paddingVertical: 10,
     borderRadius: 24,
@@ -240,6 +393,9 @@ const styles = StyleSheet.create({
     fontSize: FontSize.xl,
     fontWeight: FontWeight.bold,
     color: Colors.textPrimary,
+    fontFamily: Typography.fontFamily,
+    minWidth: 70,
+    textAlign: "center",
   },
   waveformContainer: {
     flexDirection: "row",
@@ -252,13 +408,8 @@ const styles = StyleSheet.create({
     width: 4,
     borderRadius: 2,
   },
-  barPlayed: {
-    backgroundColor: Colors.primary, // Our Moody-AI primary orange color
-  },
-  barUnplayed: {
-    backgroundColor: Colors.textTertiary,
-    opacity: 0.4,
-  },
+  barPlayed: { backgroundColor: Colors.primary },
+  barUnplayed: { backgroundColor: Colors.textTertiary, opacity: 0.4 },
   timeLabelsRow: {
     width: "100%",
     flexDirection: "row",
@@ -281,7 +432,7 @@ const styles = StyleSheet.create({
     width: 72,
     height: 72,
     borderRadius: 36,
-    backgroundColor: Colors.textPrimary, // Almost black
+    backgroundColor: Colors.textPrimary,
     alignItems: "center",
     justifyContent: "center",
     shadowColor: "#000",
@@ -290,11 +441,14 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 5,
   },
+  playButtonDisabled: {
+    opacity: 0.5,
+  },
   secondaryButton: {
     width: 52,
     height: 52,
     borderRadius: 26,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: Colors.card,
     alignItems: "center",
     justifyContent: "center",
     shadowColor: "#000",

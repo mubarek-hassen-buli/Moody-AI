@@ -15,6 +15,7 @@ export interface AudioTrack {
   title: string;
   duration: string;
   author: string;
+  audioUrl?: string;
 }
 
 interface AudioListProps {
@@ -64,7 +65,15 @@ export const AudioList: React.FC<AudioListProps> = ({ title, subtitle, tracks })
           <Pressable 
             key={track.id} 
             style={styles.trackCard} 
-            onPress={() => router.push({ pathname: "/audio-player" as any, params: { id: track.id, title: track.title } })}
+            onPress={() => router.push({ 
+              pathname: "/audio-player" as any, 
+              params: { 
+                id: track.id, 
+                title: track.title,
+                duration: track.duration,
+                audioUrl: track.audioUrl ?? "",
+              } 
+            })}
           >
             <View style={styles.trackIconContainer}>
               <PlayIconMini />

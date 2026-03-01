@@ -5,6 +5,7 @@ import { AuthModule } from './core/auth/auth.module.js';
 import { UserModule } from './modules/user/user.module.js';
 import { MoodModule } from './modules/mood/mood.module.js';
 import { JournalModule } from './modules/journal/journal.module.js';
+import { AudioModule } from './modules/audio/audio.module.js';
 
 @Module({
   imports: [
@@ -14,6 +15,7 @@ import { JournalModule } from './modules/journal/journal.module.js';
     UserModule,
     MoodModule,
     JournalModule,
+    AudioModule,
   ],
 })
 export class AppModule {}
