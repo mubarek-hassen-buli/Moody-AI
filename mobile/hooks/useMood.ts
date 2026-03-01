@@ -1,5 +1,10 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import {
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from '@tanstack/react-query';
 import api from '@/utils/api';
+import { useDataStore } from '@/stores/useDataStore';
 
 /* ──────────────────────────────────────────────────────────
  * Types
@@ -58,22 +63,32 @@ export function useCreateMood() {
 
 /**
  * Fetches the last 7 days of mood scores for the line chart.
+ * Writes result to the Zustand store for instant subsequent renders.
  */
 export function useWeeklyMoods() {
+  const setWeeklyMoods = useDataStore((s) => s.setWeeklyMoods);
+
   return useQuery<WeeklyDay[]>({
     queryKey: MOOD_KEYS.weekly,
     queryFn: async () => {
       const { data } = await api.get('/mood/weekly');
       return data.data;
     },
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    staleTime: 10 * 60 * 1000, // 10 minutes
+    select: (moods) => {
+      setWeeklyMoods(moods);
+      return moods;
+    },
   });
 }
 
 /**
  * Fetches emotion percentage breakdown for the donut chart (last 30 days).
+ * Writes result to the Zustand store for instant subsequent renders.
  */
 export function useMoodStats() {
+  const setMoodStats = useDataStore((s) => s.setMoodStats);
+
   return useQuery<MoodStats>({
     queryKey: MOOD_KEYS.stats,
     queryFn: async () => {
@@ -81,5 +96,9 @@ export function useMoodStats() {
       return data.data;
     },
     staleTime: 10 * 60 * 1000, // 10 minutes
+    select: (stats) => {
+      setMoodStats(stats);
+      return stats;
+    },
   });
 }

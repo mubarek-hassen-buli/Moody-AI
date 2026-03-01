@@ -24,6 +24,7 @@ import {
   useDeleteJournal,
   type JournalEntry,
 } from "@/hooks/useJournal";
+import { useDataStore } from "@/stores/useDataStore";
 
 /* ──────────────────────────────────────────────────────────
  * Component
@@ -33,7 +34,13 @@ export default function JournalScreen() {
   const insets = useSafeAreaInsets();
 
   // ── Data ──────────────────────────────────────────────────
+  const cachedEntries = useDataStore((s) => s.journalEntries);
   const { data: entries, isLoading, isError, refetch } = useJournalEntries();
+
+  // Zustand cache as instant fallback — spinner only on very first launch
+  const displayEntries = entries ?? (cachedEntries.length > 0 ? cachedEntries : null);
+  const displayLoading = isLoading && !displayEntries;
+
   const createJournal = useCreateJournal();
   const updateJournal = useUpdateJournal();
   const deleteJournal = useDeleteJournal();
@@ -138,13 +145,13 @@ export default function JournalScreen() {
       </View>
 
       {/* ── Body ─────────────────────────────────────────── */}
-      {isLoading && (
+      {displayLoading && (
         <View style={styles.centered}>
           <ActivityIndicator size="large" color={Colors.primary} />
         </View>
       )}
 
-      {isError && (
+      {isError && !displayEntries && (
         <View style={styles.centered}>
           <Text style={styles.emptyIcon}>⚠️</Text>
           <Text style={styles.emptyText}>Could not load entries.</Text>
@@ -154,7 +161,7 @@ export default function JournalScreen() {
         </View>
       )}
 
-      {!isLoading && !isError && entries?.length === 0 && (
+      {!displayLoading && !isError && displayEntries?.length === 0 && (
         <View style={styles.centered}>
           <Text style={styles.emptyIcon}>📝</Text>
           <Text style={styles.emptyTitle}>No entries yet</Text>
@@ -164,9 +171,9 @@ export default function JournalScreen() {
         </View>
       )}
 
-      {!isLoading && !isError && entries && entries.length > 0 && (
+      {!displayLoading && displayEntries && displayEntries.length > 0 && (
         <FlatList
-          data={entries}
+          data={displayEntries}
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}

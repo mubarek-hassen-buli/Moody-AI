@@ -11,10 +11,26 @@ import { Typography } from "@/constants/typography";
 import { Spacing, SCREEN_PADDING } from "@/constants/spacing";
 import { useWeeklyMoods, useMoodStats } from "@/hooks/useMood";
 
+import { useDataStore } from "@/stores/useDataStore";
+
 export default function StatisticsScreen() {
   const insets = useSafeAreaInsets();
+
+  // Zustand: instant synchronous data from last successful fetch
+  const cachedWeekly = useDataStore((s) => s.weeklyMoods);
+  const cachedStats = useDataStore((s) => s.moodStats);
+
   const { data: weeklyData, isLoading: weeklyLoading } = useWeeklyMoods();
   const { data: statsData, isLoading: statsLoading } = useMoodStats();
+
+  // Show Zustand cache while TanStack re-validates in the background.
+  // Spinner only appears if both TanStack is loading AND Zustand is empty
+  // (i.e. the very first launch before any data has ever been fetched).
+  const displayWeekly = weeklyData ?? (cachedWeekly.length > 0 ? cachedWeekly : undefined);
+  const displayStats = statsData ?? (cachedStats ?? undefined);
+  const displayWeeklyLoading = weeklyLoading && !displayWeekly;
+  const displayStatsLoading = statsLoading && !displayStats;
+
 
   return (
     <View style={styles.root}>
@@ -34,15 +50,15 @@ export default function StatisticsScreen() {
         {/* ── Mood Line Chart ─────────────────────────────── */}
         <MoodChart
           style={styles.card}
-          data={weeklyData}
-          loading={weeklyLoading}
+          data={displayWeekly}
+          loading={displayWeeklyLoading}
         />
 
         {/* ── Emotion Donut Breakdown ─────────────────────── */}
         <EmotionBreakdown
           style={styles.card}
-          data={statsData?.breakdown}
-          loading={statsLoading}
+          data={displayStats?.breakdown}
+          loading={displayStatsLoading}
         />
 
         {/* ── Recovery Insights ───────────────────────────── */}

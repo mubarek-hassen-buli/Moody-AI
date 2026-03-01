@@ -2,12 +2,21 @@ import React from "react";
 import { ActivityIndicator, View, StyleSheet, Text } from "react-native";
 import { AudioList } from "@/components/home/AudioList";
 import { useAudioByCategory } from "@/hooks/useAudio";
+import { useDataStore } from "@/stores/useDataStore";
 import { Colors } from "@/constants/colors";
 
 export default function DanceWorkoutsScreen() {
+  // Instant synchronous data from last successful fetch (no spinner)
+  const cachedTracks = useDataStore((s) => s.workoutTracks);
+
   const { data: tracks, isLoading, isError } = useAudioByCategory("workout");
 
-  if (isLoading) {
+  // Show Zustand cache while TanStack re-validates. Spinner only if
+  // both TanStack is loading AND the cache is completely empty.
+  const displayTracks = tracks ?? (cachedTracks.length > 0 ? cachedTracks : null);
+  const displayLoading = isLoading && !displayTracks;
+
+  if (displayLoading) {
     return (
       <View style={styles.centered}>
         <ActivityIndicator size="large" color={Colors.primary} />
@@ -15,7 +24,7 @@ export default function DanceWorkoutsScreen() {
     );
   }
 
-  if (isError || !tracks) {
+  if (isError && !displayTracks) {
     return (
       <View style={styles.centered}>
         <Text style={styles.errorText}>Could not load audio tracks.</Text>
@@ -23,12 +32,11 @@ export default function DanceWorkoutsScreen() {
     );
   }
 
-  // Map from API shape to the shape AudioList expects
-  const mapped = tracks.map((t) => ({
+  const mapped = (displayTracks ?? []).map((t) => ({
     id: t.id,
     title: t.title,
     duration: t.duration,
-    author: "",          // Author intentionally omitted per product decision
+    author: "",
     audioUrl: t.audioUrl,
   }));
 

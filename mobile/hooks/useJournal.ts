@@ -4,6 +4,7 @@ import {
   useQueryClient,
 } from '@tanstack/react-query';
 import api from '@/utils/api';
+import { useDataStore } from '@/stores/useDataStore';
 
 /* ──────────────────────────────────────────────────────────
  * Types
@@ -41,15 +42,24 @@ export const JOURNAL_KEYS = {
  * Hooks
  * ────────────────────────────────────────────────────────── */
 
-/** Fetch all journal entries for the current user. */
+/**
+ * Fetch all journal entries for the current user (newest first).
+ * Writes to the Zustand store for instant subsequent renders.
+ */
 export function useJournalEntries() {
+  const setJournalEntries = useDataStore((s) => s.setJournalEntries);
+
   return useQuery<JournalEntry[]>({
     queryKey: JOURNAL_KEYS.all,
     queryFn: async () => {
       const { data } = await api.get('/journal');
       return data.data;
     },
-    staleTime: 2 * 60 * 1000, // 2 minutes
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    select: (entries) => {
+      setJournalEntries(entries);
+      return entries;
+    },
   });
 }
 

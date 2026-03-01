@@ -19,7 +19,11 @@ import { ActivityCard } from "@/components/home/ActivityCard";
 import { Colors } from "@/constants/colors";
 import { Typography, FontSize, FontWeight } from "@/constants/typography";
 import { Spacing, SCREEN_PADDING, BorderRadius } from "@/constants/spacing";
-import { useCreateMood, type MoodLevel } from "@/hooks/useMood";
+import { useCreateMood, type MoodLevel, MOOD_KEYS } from "@/hooks/useMood";
+import { JOURNAL_KEYS } from "@/hooks/useJournal";
+import { AUDIO_KEYS } from "@/hooks/useAudio";
+import { useQueryClient } from "@tanstack/react-query";
+import api from "@/utils/api";
 
 /* ──────────────────────────────────────────────────────────
  * Inline Icons
@@ -81,6 +85,8 @@ export default function HomeScreen() {
   const [selectorState, setSelectorState] = useState<MoodSelectorState>('idle');
   const createMood = useCreateMood();
 
+  const queryClient = useQueryClient();
+
   // On mount: check if the user already logged a mood today
   useEffect(() => {
     SecureStore.getItemAsync(MOOD_DATE_KEY).then((stored) => {
@@ -93,6 +99,38 @@ export default function HomeScreen() {
       }
     });
   }, []);
+
+  // Prefetch all other tab data in the background as soon as the home
+  // screen mounts. This warms TanStack's cache so Journal, Stats, and
+  // Audio screens render without a loading spinner on first visit.
+  useEffect(() => {
+    queryClient.prefetchQuery({
+      queryKey: MOOD_KEYS.weekly,
+      queryFn: async () => { const { data } = await api.get('/mood/weekly'); return data.data; },
+      staleTime: 10 * 60 * 1000,
+    });
+    queryClient.prefetchQuery({
+      queryKey: MOOD_KEYS.stats,
+      queryFn: async () => { const { data } = await api.get('/mood/stats'); return data.data; },
+      staleTime: 10 * 60 * 1000,
+    });
+    queryClient.prefetchQuery({
+      queryKey: JOURNAL_KEYS.all,
+      queryFn: async () => { const { data } = await api.get('/journal'); return data.data; },
+      staleTime: 5 * 60 * 1000,
+    });
+    queryClient.prefetchQuery({
+      queryKey: AUDIO_KEYS.byCategory('relaxing'),
+      queryFn: async () => { const { data } = await api.get('/audio/relaxing'); return data.data; },
+      staleTime: 30 * 60 * 1000,
+    });
+    queryClient.prefetchQuery({
+      queryKey: AUDIO_KEYS.byCategory('workout'),
+      queryFn: async () => { const { data } = await api.get('/audio/workout'); return data.data; },
+      staleTime: 30 * 60 * 1000,
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // run once on mount
 
   const handleMoodSelect = useCallback((key: string) => {
     // If already confirmed, don't allow re-selection
