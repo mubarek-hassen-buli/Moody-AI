@@ -38,6 +38,7 @@ export default function DanceWorkoutsScreen() {
     duration: t.duration,
     author: "",
     audioUrl: t.audioUrl,
+    category: t.category,
   }));
 
   return (

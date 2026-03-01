@@ -16,6 +16,7 @@ export interface AudioTrack {
   duration: string;
   author: string;
   audioUrl?: string;
+  category?: string;
 }
 
 interface AudioListProps {
@@ -72,6 +73,7 @@ export const AudioList: React.FC<AudioListProps> = ({ title, subtitle, tracks })
                 title: track.title,
                 duration: track.duration,
                 audioUrl: track.audioUrl ?? "",
+                category: track.category ?? "",
               } 
             })}
           >

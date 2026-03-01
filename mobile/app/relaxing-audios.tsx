@@ -38,6 +38,7 @@ export default function RelaxingAudiosScreen() {
     duration: t.duration,
     author: "",
     audioUrl: t.audioUrl,
+    category: t.category,
   }));
 
   return (

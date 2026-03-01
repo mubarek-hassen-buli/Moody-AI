@@ -85,10 +85,17 @@ export default function AudioPlayerScreen() {
     title?: string;
     duration?: string;
     audioUrl?: string;
+    category?: string;
   }>();
 
   const displayTitle = params.title ?? "Audio Session";
   const audioUrl = params.audioUrl ?? "";
+  const isWorkout = params.category === "workout";
+
+  // Pick the correct illustration based on audio category
+  const illustrationSource = isWorkout
+    ? require("@/assets/images/workout.jpg")
+    : require("@/assets/images/yoga.jpg");
 
   // ── Playback state ─────────────────────────────────────
   const soundRef = useRef<Audio.Sound | null>(null);
@@ -201,7 +208,7 @@ export default function AudioPlayerScreen() {
       {/* ── Illustration ─────────────────────────────────── */}
       <View style={styles.imageContainer}>
         <Image
-          source={require("@/assets/images/yoga.jpg")}
+          source={illustrationSource}
           style={styles.illustration}
           resizeMode="cover"
         />

@@ -62,7 +62,12 @@ export default function StatisticsScreen() {
         />
 
         {/* ── Recovery Insights ───────────────────────────── */}
-        <InsightCard style={styles.card} />
+        <InsightCard 
+          style={styles.card} 
+          weeklyData={displayWeekly}
+          statsData={displayStats ?? null}
+          loading={displayWeeklyLoading || displayStatsLoading}
+        />
       </ScrollView>
     </View>
   );
