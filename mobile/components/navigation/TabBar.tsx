@@ -277,7 +277,7 @@ export function CustomTabBar({ state, descriptors, navigation }: BottomTabBarPro
             <View style={styles.fabMenuDivider} />
             <Pressable
               style={styles.fabMenuItem}
-              onPress={() => { setFabOpen(false); }}
+              onPress={() => { setFabOpen(false); router.push("/voice-call" as any); }}
             >
               <Text style={styles.fabMenuText}>📞 Call</Text>
             </Pressable>

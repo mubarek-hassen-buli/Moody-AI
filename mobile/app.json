@@ -39,7 +39,8 @@
           }
         }
       ],
-      "expo-secure-store"
+      "expo-secure-store",
+      "@siteed/expo-audio-studio"
     ],
     "experiments": {
       "typedRoutes": true,

@@ -28,16 +28,20 @@ const queryClient = new QueryClient({
   },
 });
 
+import { AudioRecorderProvider } from "@siteed/expo-audio-studio";
+
 export default function RootLayout() {
   return (
     <QueryClientProvider client={queryClient}>
-      <StatusBar style="auto" />
-      <Stack
-        screenOptions={{
-          headerShown: false,
-          animation: "fade",
-        }}
-      />
+      <AudioRecorderProvider>
+        <StatusBar style="auto" />
+        <Stack
+          screenOptions={{
+            headerShown: false,
+            animation: "fade",
+          }}
+        />
+      </AudioRecorderProvider>
     </QueryClientProvider>
   );
 }
