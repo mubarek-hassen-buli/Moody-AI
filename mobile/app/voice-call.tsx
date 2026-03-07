@@ -69,8 +69,13 @@ const Waveform = ({ active }: { active: boolean }) => {
 export default function VoiceCallScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { isCalling, isMuted, setIsMuted, error, startCall, stopCall } = useVoiceCall();
+  const { isCalling, isConnecting, isMuted, setIsMuted, error, startCall, stopCall } = useVoiceCall();
   const [timer, setTimer] = useState(0);
+
+  // Auto-start the call when the screen mounts
+  useEffect(() => {
+    startCall();
+  }, []);
 
   useEffect(() => {
     let interval: any;
@@ -93,6 +98,14 @@ export default function VoiceCallScreen() {
     router.back();
   };
 
+  const statusLabel = error
+    ? "Error connecting"
+    : isCalling
+      ? "On Call"
+      : isConnecting
+        ? "Connecting..."
+        : "Ready";
+
   return (
     <View style={styles.container}>
       <StatusBar style="light" />
@@ -105,9 +118,7 @@ export default function VoiceCallScreen() {
 
       <View style={[styles.content, { paddingTop: insets.top + Spacing.xl }]}>
         <Text style={styles.title}>Moody AI Voice</Text>
-        <Text style={styles.status}>
-          {error ? "Error connecting" : isCalling ? "On Call" : "Connecting..."}
-        </Text>
+        <Text style={styles.status}>{statusLabel}</Text>
         
         {isCalling && <Text style={styles.timer}>{formatTime(timer)}</Text>}
 

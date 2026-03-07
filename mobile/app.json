@@ -7,9 +7,13 @@
     "icon": "./assets/images/icon.png",
     "scheme": "mobile",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
+    "newArchEnabled": false,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSMicrophoneUsageDescription": "Moody needs microphone access for AI voice calls",
+        "UIBackgroundModes": ["voip"]
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -20,7 +24,18 @@
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "package": "com.Moody.mobile"
+      "package": "com.Moody.mobile",
+      "permissions": [
+        "android.permission.RECORD_AUDIO",
+        "android.permission.MODIFY_AUDIO_SETTINGS",
+        "android.permission.INTERNET",
+        "android.permission.ACCESS_NETWORK_STATE",
+        "android.permission.CAMERA",
+        "android.permission.WAKE_LOCK",
+        "android.permission.BLUETOOTH",
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.FOREGROUND_SERVICE_MICROPHONE"
+      ]
     },
     "web": {
       "output": "static",
@@ -41,7 +56,19 @@
         }
       ],
       "expo-secure-store",
-      "@siteed/expo-audio-studio"
+      "@siteed/expo-audio-studio",
+      "@config-plugins/react-native-webrtc",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "minSdkVersion": 24
+          },
+          "ios": {
+            "deploymentTarget": "15.1"
+          }
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,
