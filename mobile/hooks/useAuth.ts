@@ -33,13 +33,15 @@ interface AuthState {
 export const useAuthStore = create<AuthState>((set) => {
   /**
    * Sync the authenticated user to Neon via our backend.
-   * Silently fails — auth still works even if backend is down.
+   * Logs errors to console but doesn't block the auth flow.
    */
   const syncUserToBackend = async () => {
     try {
-      await api.get('/user/me');
-    } catch {
-      // Backend sync is best-effort; don't block auth flow
+      console.log('[Auth] Syncing user to backend...');
+      const res = await api.get('/user/me');
+      console.log('[Auth] User synced to Neon ✅', res.data?.data?.id);
+    } catch (err: any) {
+      console.error('[Auth] ❌ Backend sync failed:', err?.response?.status, err?.response?.data || err?.message);
     }
   };
 
@@ -71,9 +73,18 @@ export const useAuthStore = create<AuthState>((set) => {
           initialized: true,
         });
 
+        // Ensure the user exists in Neon on every app cold-start
+        if (session) {
+          await syncUserToBackend();
+        }
+
         // Listen for auth state changes (token refresh, sign out, etc.)
-        supabase.auth.onAuthStateChange((_event, session) => {
-          set({ session, user: session?.user ?? null });
+        supabase.auth.onAuthStateChange((_event, newSession) => {
+          set({ session: newSession, user: newSession?.user ?? null });
+          // Re-sync on token refresh / new sign-in from another flow
+          if (newSession) {
+            syncUserToBackend();
+          }
         });
       } catch {
         set({ session: null, user: null, initialized: true });

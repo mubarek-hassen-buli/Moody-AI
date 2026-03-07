@@ -95,7 +95,9 @@ export function useVoiceCall() {
     wsRef.current = null;
     setIsCalling(false);
     soundQueue.current = [];
-    await audioRecorder.stopRecording();
+    if (audioRecorder.isRecording) {
+      await audioRecorder.stopRecording();
+    }
   }, [audioRecorder]);
 
   const connect = useCallback(async () => {
@@ -185,7 +187,7 @@ export function useVoiceCall() {
           }
         }
       });
-    } else {
+    } else if (audioRecorder.isRecording) {
       audioRecorder.stopRecording();
     }
   }, [isCalling, isMuted, audioRecorder]);
