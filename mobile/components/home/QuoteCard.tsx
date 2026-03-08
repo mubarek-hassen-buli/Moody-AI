@@ -10,7 +10,7 @@ import Svg, { Path } from "react-native-svg";
 import { Colors } from "@/constants/colors";
 import { Typography, FontSize, FontWeight } from "@/constants/typography";
 import { Spacing, BorderRadius } from "@/constants/spacing";
-import { useQuoteOfDay, useRefreshQuote } from "@/hooks/useQuote";
+import { useQuoteOfDay } from "@/hooks/useQuote";
 
 /* ──────────────────────────────────────────────────────────
  * Icons
@@ -35,42 +35,12 @@ const QuoteIcon = () => (
   </Svg>
 );
 
-const RefreshIcon = () => (
-  <Svg width={18} height={18} viewBox="0 0 24 24" fill="none">
-    <Path
-      d="M23 4v6h-6M1 20v-6h6"
-      stroke={Colors.textTertiary}
-      strokeWidth={2}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    />
-    <Path
-      d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"
-      stroke={Colors.textTertiary}
-      strokeWidth={2}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    />
-  </Svg>
-);
-
 /* ──────────────────────────────────────────────────────────
  * Component
  * ────────────────────────────────────────────────────────── */
 
 export const QuoteCard: React.FC = () => {
   const { data: quote, isLoading } = useQuoteOfDay();
-  const refreshQuote = useRefreshQuote();
-  const [refreshing, setRefreshing] = useState(false);
-
-  const handleRefresh = useCallback(async () => {
-    setRefreshing(true);
-    try {
-      await refreshQuote();
-    } finally {
-      setRefreshing(false);
-    }
-  }, [refreshQuote]);
 
   if (isLoading) {
     return (
@@ -84,25 +54,12 @@ export const QuoteCard: React.FC = () => {
 
   return (
     <View style={styles.card}>
-      {/* Quote icon */}
+      {/* Quote header */}
       <View style={styles.iconRow}>
         <View style={styles.iconCircle}>
           <QuoteIcon />
         </View>
         <Text style={styles.label}>Daily Inspiration</Text>
-        <Pressable
-          style={styles.refreshButton}
-          onPress={handleRefresh}
-          disabled={refreshing}
-          hitSlop={12}
-          accessibilityLabel="Get a new quote"
-        >
-          {refreshing ? (
-            <ActivityIndicator size="small" color={Colors.textTertiary} />
-          ) : (
-            <RefreshIcon />
-          )}
-        </Pressable>
       </View>
 
       {/* Quote text */}
@@ -162,16 +119,6 @@ const styles = StyleSheet.create({
     fontFamily: Typography.fontFamily,
     textTransform: "uppercase",
     letterSpacing: 0.8,
-  },
-  refreshButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: Colors.backgroundSecondary,
-    borderWidth: 1,
-    borderColor: Colors.borderLight,
-    alignItems: "center",
-    justifyContent: "center",
   },
 
   /* Quote body */

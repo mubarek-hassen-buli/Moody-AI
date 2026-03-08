@@ -16,14 +16,4 @@ export class QuoteController {
     const quote = await this.quoteService.getToday();
     return { data: quote };
   }
-
-  /**
-   * GET /api/quotes/random
-   * Returns a random quote (for the "refresh" action).
-   */
-  @Get('random')
-  async getRandom() {
-    const quote = await this.quoteService.getRandom();
-    return { data: quote };
-  }
 }

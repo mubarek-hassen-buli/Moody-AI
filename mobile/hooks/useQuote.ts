@@ -36,15 +36,3 @@ export function useQuoteOfDay() {
     staleTime: 60 * 60 * 1000, // 1 hour
   });
 }
-
-/** Returns a callback that fetches a random quote and replaces the cache. */
-export function useRefreshQuote() {
-  const queryClient = useQueryClient();
-
-  const refresh = useCallback(async () => {
-    const { data } = await api.get("/quotes/random");
-    queryClient.setQueryData<Quote>(QUOTE_KEYS.today, data.data);
-  }, [queryClient]);
-
-  return refresh;
-}
