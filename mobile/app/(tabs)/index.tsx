@@ -26,6 +26,11 @@ import { useProfile } from "@/hooks/useProfile";
 import { useQueryClient } from "@tanstack/react-query";
 import api from "@/utils/api";
 
+// ── Activity Card Images ──────────────────────────────────
+const yogaImg = require("@/assets/images/yoga.jpg");
+const workoutImg = require("@/assets/images/workout.jpg");
+const journalImg = require("@/assets/images/journal.jpg");
+
 /* ──────────────────────────────────────────────────────────
  * Inline Icons
  * ────────────────────────────────────────────────────────── */
@@ -237,21 +242,21 @@ export default function HomeScreen() {
           <ActivityCard
             title="Relaxing Audios"
             subtitle="Calm your mind"
-            backgroundColor="#FFF3EC"
+            backgroundImage={yogaImg}
             style={{ width: 160 }}
             onPress={() => router.push("/relaxing-audios" as any)}
           />
           <ActivityCard
             title="Dance Workout"
             subtitle="Get your body moving"
-            backgroundColor="#EAF1F0"
+            backgroundImage={workoutImg}
             style={{ width: 160 }}
             onPress={() => router.push("/dance-workouts" as any)}
           />
           <ActivityCard
             title="Mood Journal"
             subtitle="Reflect on your day"
-            backgroundColor="#F0EBE5"
+            backgroundImage={journalImg}
             style={{ width: 160 }}
             onPress={() => router.navigate("/(tabs)/journal" as any)}
           />

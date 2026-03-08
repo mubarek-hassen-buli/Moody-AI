@@ -29,6 +29,8 @@ export class UserController {
     @CurrentUser() supabaseUser: any,
     @Body() dto: UpdateProfileDto,
   ) {
+    console.log('[UserController] PATCH /me called');
+    console.log('[UserController] Body keys:', Object.keys(dto));
     const user = await this.userService.updateProfile(supabaseUser.id, dto);
     return { data: user };
   }

@@ -1,5 +1,5 @@
-import React from "react";
 import {
+  ImageBackground,
   Pressable,
   StyleSheet,
   Text,
@@ -22,6 +22,8 @@ interface ActivityCardProps {
   subtitle: string;
   /** Background tint for the card. */
   backgroundColor?: string;
+  /** Background image for the card. */
+  backgroundImage?: any;
   /** Called when the card is pressed. */
   onPress?: () => void;
   /** Override container style. */
@@ -36,7 +38,7 @@ const ArrowIcon: React.FC = () => (
   <Svg width={18} height={18} viewBox="0 0 24 24" fill="none">
     <Path
       d="M7 17L17 7M17 7H7M17 7v10"
-      stroke={Colors.textPrimary}
+      stroke="#FFFFFF"
       strokeWidth={2}
       strokeLinecap="round"
       strokeLinejoin="round"
@@ -52,33 +54,53 @@ export const ActivityCard: React.FC<ActivityCardProps> = ({
   title,
   subtitle,
   backgroundColor = "#FFF3EC",
+  backgroundImage,
   onPress,
   style,
-}) => (
-  <Pressable
-    onPress={onPress}
-    style={({ pressed }) => [
-      styles.card,
-      { backgroundColor },
-      pressed && styles.pressed,
-      style,
-    ]}
-    accessibilityRole="button"
-    accessibilityLabel={title}
-  >
-    <View style={styles.content}>
-      <Text style={styles.title} numberOfLines={2}>
-        {title}
-      </Text>
-      <Text style={styles.subtitle} numberOfLines={2}>
-        {subtitle}
-      </Text>
-    </View>
-    <View style={styles.arrowContainer}>
-      <ArrowIcon />
-    </View>
-  </Pressable>
-);
+}) => {
+  const CardContent = (
+    <>
+      {backgroundImage && <View style={styles.imageOverlay} />}
+      <View style={styles.content}>
+        <Text style={[styles.title, backgroundImage && styles.textWhite]} numberOfLines={2}>
+          {title}
+        </Text>
+        <Text style={[styles.subtitle, backgroundImage && styles.textWhiteLight]} numberOfLines={2}>
+          {subtitle}
+        </Text>
+      </View>
+      <View style={[styles.arrowContainer, backgroundImage && styles.arrowContainerOverlay]}>
+        <ArrowIcon />
+      </View>
+    </>
+  );
+
+  return (
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.card,
+        { backgroundColor },
+        pressed && styles.pressed,
+        style,
+      ]}
+      accessibilityRole="button"
+      accessibilityLabel={title}
+    >
+      {backgroundImage ? (
+        <ImageBackground
+          source={backgroundImage}
+          style={styles.imageBackground}
+          imageStyle={styles.imageStyle}
+        >
+          {CardContent}
+        </ImageBackground>
+      ) : (
+        CardContent
+      )}
+    </Pressable>
+  );
+};
 
 /* ──────────────────────────────────────────────────────────
  * Styles
@@ -116,8 +138,30 @@ const styles = StyleSheet.create({
     height: 32,
     borderRadius: 16,
     backgroundColor: Colors.backgroundSecondary,
-    alignItems: "center",
-    justifyContent: "center",
+    alignItems: "center" as const,
+    justifyContent: "center" as const,
     marginTop: Spacing.sm,
+  },
+  arrowContainerOverlay: {
+    backgroundColor: "rgba(255,255,255,0.2)",
+  },
+  imageBackground: {
+    ...StyleSheet.absoluteFillObject,
+    padding: Spacing.base,
+    justifyContent: "space-between",
+  },
+  imageStyle: {
+    borderRadius: BorderRadius.lg,
+  },
+  imageOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0,0,0,0.25)",
+    borderRadius: BorderRadius.lg,
+  },
+  textWhite: {
+    color: "#FFFFFF",
+  },
+  textWhiteLight: {
+    color: "rgba(255,255,255,0.8)",
   },
 });
