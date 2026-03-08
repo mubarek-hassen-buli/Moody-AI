@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Image,
   Modal,
   Pressable,
   ScrollView,
@@ -14,6 +15,7 @@ import {
 import { StatusBar } from "expo-status-bar";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Svg, { Path, Circle } from "react-native-svg";
+import * as ImagePicker from "expo-image-picker";
 
 import { Colors } from "@/constants/colors";
 import { FontSize, FontWeight, Typography } from "@/constants/typography";
@@ -53,6 +55,19 @@ const ChevronIcon = () => (
       strokeLinecap="round"
       strokeLinejoin="round"
     />
+  </Svg>
+);
+
+const CameraIcon = () => (
+  <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
+    <Path
+      d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"
+      stroke="#FFF"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+    <Circle cx={12} cy={13} r={4} stroke="#FFF" strokeWidth={2} />
   </Svg>
 );
 
@@ -114,7 +129,7 @@ export default function ProfileScreen() {
   const signOutLoading = useAuthStore((s) => s.loading);
 
   const { data: profile, isLoading: profileLoading } = useProfile();
-  const { mutate: updateName, isPending: updating } = useUpdateProfile();
+  const { mutate: updateProfile, isPending: updating } = useUpdateProfile();
 
   // ── Local UI state ────────────────────────────────────────
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
@@ -130,7 +145,7 @@ export default function ProfileScreen() {
 
   const handleSaveName = () => {
     if (!draftName.trim()) return;
-    updateName(
+    updateProfile(
       { name: draftName.trim() },
       { onSuccess: () => setEditModalVisible(false) }
     );
@@ -155,12 +170,34 @@ export default function ProfileScreen() {
   // ── Derived display values ────────────────────────────────
   const displayName = profile?.name ?? "Moody User";
   const displayEmail = profile?.email ?? "";
+  const avatarUrl = profile?.avatarUrl ?? null;
   const initials = displayName
     .split(" ")
     .map((w) => w[0])
     .join("")
     .toUpperCase()
     .slice(0, 2);
+
+  // ── Avatar picker ────────────────────────────────────────
+  const handlePickAvatar = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== "granted") {
+      Alert.alert("Permission needed", "Please allow access to your photos.");
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ["images"],
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.7,
+      base64: true,
+    });
+
+    if (!result.canceled && result.assets[0]?.base64) {
+      updateProfile({ avatarBase64: result.assets[0].base64 });
+    }
+  };
 
   return (
     <View style={styles.root}>
@@ -196,13 +233,28 @@ export default function ProfileScreen() {
               style={styles.avatarLoader}
             />
           ) : (
-            <View style={styles.avatarCircle}>
-              {displayName ? (
-                <Text style={styles.avatarInitials}>{initials}</Text>
-              ) : (
-                <UserIcon />
+            <Pressable onPress={handlePickAvatar} style={styles.avatarWrapper}>
+              <View style={styles.avatarCircle}>
+                {avatarUrl ? (
+                  <Image
+                    source={{ uri: avatarUrl }}
+                    style={styles.avatarImage}
+                  />
+                ) : displayName ? (
+                  <Text style={styles.avatarInitials}>{initials}</Text>
+                ) : (
+                  <UserIcon />
+                )}
+              </View>
+              <View style={styles.cameraBadge}>
+                <CameraIcon />
+              </View>
+              {updating && (
+                <View style={styles.avatarOverlay}>
+                  <ActivityIndicator size="small" color="#FFF" />
+                </View>
               )}
-            </View>
+            </Pressable>
           )}
           <Text style={styles.profileName}>{displayName}</Text>
           <Text style={styles.profileEmail}>{displayEmail}</Text>
@@ -401,19 +453,48 @@ const styles = StyleSheet.create({
     height: 88,
     marginBottom: Spacing.base,
   },
+  avatarWrapper: {
+    position: "relative" as const,
+    marginBottom: Spacing.base,
+  },
   avatarCircle: {
     width: 88,
     height: 88,
     borderRadius: 44,
     backgroundColor: Colors.primaryLight,
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: Spacing.base,
+    alignItems: "center" as const,
+    justifyContent: "center" as const,
+    overflow: "hidden" as const,
     shadowColor: Colors.primary,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.25,
     shadowRadius: 12,
     elevation: 6,
+  },
+  avatarImage: {
+    width: 88,
+    height: 88,
+    borderRadius: 44,
+  },
+  cameraBadge: {
+    position: "absolute" as const,
+    bottom: 0,
+    right: 0,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: Colors.primary,
+    alignItems: "center" as const,
+    justifyContent: "center" as const,
+    borderWidth: 2,
+    borderColor: Colors.background,
+  },
+  avatarOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    borderRadius: 44,
+    backgroundColor: "rgba(0,0,0,0.4)",
+    alignItems: "center" as const,
+    justifyContent: "center" as const,
   },
   avatarInitials: {
     fontSize: 30,

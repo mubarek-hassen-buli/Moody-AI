@@ -8,6 +8,11 @@ const updateProfileSchema = z.object({
     .min(1, 'Name cannot be empty')
     .max(100, 'Name cannot exceed 100 characters')
     .optional(),
+
+  avatarBase64: z
+    .string({ message: 'Avatar must be a base64 string' })
+    .min(1, 'Avatar data cannot be empty')
+    .optional(),
 });
 
 export class UpdateProfileDto extends createZodDto(updateProfileSchema) {}

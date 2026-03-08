@@ -22,6 +22,7 @@ import { Spacing, SCREEN_PADDING, BorderRadius } from "@/constants/spacing";
 import { useCreateMood, type MoodLevel, MOOD_KEYS } from "@/hooks/useMood";
 import { JOURNAL_KEYS } from "@/hooks/useJournal";
 import { AUDIO_KEYS } from "@/hooks/useAudio";
+import { useProfile } from "@/hooks/useProfile";
 import { useQueryClient } from "@tanstack/react-query";
 import api from "@/utils/api";
 
@@ -84,6 +85,16 @@ export default function HomeScreen() {
   const [selectedMood, setSelectedMood] = useState<string | null>(null);
   const [selectorState, setSelectorState] = useState<MoodSelectorState>('idle');
   const createMood = useCreateMood();
+  const { data: profile } = useProfile();
+
+  const displayName = profile?.name ?? "Friend";
+  const avatarUrl = profile?.avatarUrl ?? null;
+  const initials = displayName
+    .split(" ")
+    .map((w) => w[0])
+    .join("")
+    .toUpperCase()
+    .slice(0, 2);
 
   const queryClient = useQueryClient();
 
@@ -175,11 +186,18 @@ export default function HomeScreen() {
           <View style={styles.header}>
             <View style={styles.headerLeft}>
               <View style={styles.avatar}>
-                <Text style={styles.avatarText}>😊</Text>
+                {avatarUrl ? (
+                  <Image
+                    source={{ uri: avatarUrl }}
+                    style={styles.homeAvatarImage}
+                  />
+                ) : (
+                  <Text style={styles.avatarText}>{initials || "😊"}</Text>
+                )}
               </View>
               <View style={styles.headerTextBlock}>
                 <Text style={styles.greeting}>Hi 👋</Text>
-                <Text style={styles.userName}>Friend</Text>
+                <Text style={styles.userName}>{displayName}</Text>
               </View>
             </View>
             <Pressable style={styles.bellButton} accessibilityLabel="Notifications">
@@ -294,7 +312,14 @@ const styles = StyleSheet.create({
     marginRight: Spacing.md,
   },
   avatarText: {
-    fontSize: 22,
+    fontSize: 16,
+    fontWeight: "600" as const,
+    color: Colors.primaryDark,
+  },
+  homeAvatarImage: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
   },
   headerTextBlock: {
     justifyContent: "center",

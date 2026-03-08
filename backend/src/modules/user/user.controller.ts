@@ -22,14 +22,14 @@ export class UserController {
 
   /**
    * PATCH /api/user/me
-   * Updates the current user's display name.
+   * Updates the current user's profile (name and/or avatar).
    */
   @Patch('me')
   async updateProfile(
     @CurrentUser() supabaseUser: any,
     @Body() dto: UpdateProfileDto,
   ) {
-    const user = await this.userService.updateName(supabaseUser.id, dto);
+    const user = await this.userService.updateProfile(supabaseUser.id, dto);
     return { data: user };
   }
 }

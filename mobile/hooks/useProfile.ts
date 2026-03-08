@@ -37,18 +37,23 @@ export function useProfile() {
   });
 }
 
-/** Update the user's display name. */
+/** Update the user's profile (name and/or avatar). */
 export function useUpdateProfile() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (payload: { name: string }) => {
+    mutationFn: async (payload: { name?: string; avatarBase64?: string }) => {
+      console.log('[Profile] Updating profile...', payload.avatarBase64 ? '(with avatar)' : '(name only)');
       const { data } = await api.patch("/user/me", payload);
+      console.log('[Profile] ✅ Profile updated:', data.data?.avatarUrl);
       return data.data as UserProfile;
     },
     onSuccess: (updated) => {
       // Update cache immediately — no re-fetch needed
       queryClient.setQueryData<UserProfile>(PROFILE_KEYS.me, updated);
+    },
+    onError: (err: any) => {
+      console.error('[Profile] ❌ Update failed:', err?.response?.status, err?.response?.data || err?.message);
     },
   });
 }
