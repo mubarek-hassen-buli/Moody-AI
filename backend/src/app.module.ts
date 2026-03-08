@@ -8,6 +8,7 @@ import { JournalModule } from './modules/journal/journal.module.js';
 import { AudioModule } from './modules/audio/audio.module.js';
 import { ChatModule } from './modules/chat/chat.module.js';
 import { CloudinaryModule } from './core/cloudinary/cloudinary.module.js';
+import { QuoteModule } from './modules/quote/quote.module.js';
 
 @Module({
   imports: [
@@ -20,6 +21,7 @@ import { CloudinaryModule } from './core/cloudinary/cloudinary.module.js';
     AudioModule,
     ChatModule,
     CloudinaryModule,
+    QuoteModule,
   ],
 })
 export class AppModule {}

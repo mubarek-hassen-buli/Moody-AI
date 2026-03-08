@@ -16,6 +16,7 @@ import { useRouter } from "expo-router";
 
 import { MoodSelector, type MoodSelectorState } from "@/components/home/MoodSelector";
 import { ActivityCard } from "@/components/home/ActivityCard";
+import { QuoteCard } from "@/components/home/QuoteCard";
 import { Colors } from "@/constants/colors";
 import { Typography, FontSize, FontWeight } from "@/constants/typography";
 import { Spacing, SCREEN_PADDING, BorderRadius } from "@/constants/spacing";
@@ -265,17 +266,9 @@ export default function HomeScreen() {
           />
         </ScrollView>
 
-          {/* ── Quick Tips ─────────────────────────────────── */}
-          <Text style={styles.sectionTitle}>Quick tips</Text>
-          <View style={styles.tipCard}>
-            <Text style={styles.tipEmoji}>💡</Text>
-            <View style={styles.tipContent}>
-              <Text style={styles.tipTitle}>Take a deep breath</Text>
-              <Text style={styles.tipSubtitle}>
-                Pause for a moment. Inhale for 4 seconds, hold for 4, exhale for 6.
-              </Text>
-            </View>
-          </View>
+          {/* ── Daily Quote ────────────────────────────────── */}
+          <Text style={styles.sectionTitle}>Daily Inspiration</Text>
+          <QuoteCard />
         </View>
       </ScrollView>
     </View>
@@ -410,35 +403,4 @@ const styles = StyleSheet.create({
     marginLeft: 0,
   },
 
-  /* Tips */
-  tipCard: {
-    flexDirection: "row",
-    backgroundColor: Colors.card,
-    borderRadius: BorderRadius.lg,
-    padding: Spacing.base,
-    alignItems: "center",
-    shadowColor: Colors.shadow,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 1,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  tipEmoji: {
-    fontSize: 28,
-    marginRight: Spacing.md,
-  },
-  tipContent: {
-    flex: 1,
-  },
-  tipTitle: {
-    fontSize: FontSize.md,
-    fontWeight: FontWeight.semibold,
-    color: Colors.textPrimary,
-    marginBottom: Spacing.xs,
-  },
-  tipSubtitle: {
-    fontSize: FontSize.xs,
-    color: Colors.textSecondary,
-    lineHeight: 16,
-  },
 });
