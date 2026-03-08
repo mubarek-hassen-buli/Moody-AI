@@ -7,6 +7,7 @@ import { Colors } from "@/constants/colors";
 import { FontSize, FontWeight } from "@/constants/typography";
 import { BorderRadius, Spacing } from "@/constants/spacing";
 import { useAuthStore } from "@/hooks/useAuth";
+import { useNotifications } from "@/hooks/useNotifications";
 
 import { CustomTabBar } from "@/components/navigation/TabBar";
 
@@ -16,6 +17,7 @@ import { CustomTabBar } from "@/components/navigation/TabBar";
 
 export default function TabsLayout() {
   const session = useAuthStore((s) => s.session);
+  useNotifications();
 
   // If the user signed out, redirect to onboarding immediately
   if (!session) {

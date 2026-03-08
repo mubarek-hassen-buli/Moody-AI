@@ -1,29 +1,48 @@
 import { useEffect, useRef } from 'react';
-import * as Notifications from 'expo-notifications';
-import * as Device from 'expo-device';
 import { Platform } from 'react-native';
-import Constants from 'expo-constants';
 import api from '@/utils/api';
 import { useAuthStore } from './useAuth';
 
-// Configure notification behavior for when the app is in the foreground
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
-    shouldSetBadge: false,
-    shouldShowBanner: true,
-    shouldShowList: true,
-  }),
-});
+/**
+ * Lazily-loaded Expo modules.
+ * expo-notifications and expo-device require native modules that
+ * may not be available in Expo Go — we import them dynamically
+ * so the rest of the app keeps working even without a dev build.
+ */
+let Notifications: typeof import('expo-notifications') | null = null;
+let Device: typeof import('expo-device') | null = null;
+let Constants: typeof import('expo-constants')['default'] | null = null;
+
+try {
+  Notifications = require('expo-notifications');
+  Device = require('expo-device');
+  Constants = require('expo-constants').default;
+
+  // Configure foreground notification behavior
+  Notifications.setNotificationHandler({
+    handleNotification: async () => ({
+      shouldShowAlert: true,
+      shouldPlaySound: true,
+      shouldSetBadge: false,
+      shouldShowBanner: true,
+      shouldShowList: true,
+    }),
+  });
+} catch (e) {
+  console.warn('[Notifications] Native module not available — skipping setup.', e);
+}
+
+/* ──────────────────────────────────────────────────────────
+ * Hook
+ * ────────────────────────────────────────────────────────── */
 
 export function useNotifications() {
   const { user } = useAuthStore();
-  const notificationListener = useRef<Notifications.Subscription | null>(null);
-  const responseListener = useRef<Notifications.Subscription | null>(null);
+  const notificationListener = useRef<any>(null);
+  const responseListener = useRef<any>(null);
 
   useEffect(() => {
-    if (!user) return;
+    if (!user || !Notifications) return;
 
     registerForPushNotificationsAsync().then(token => {
       if (token) {
@@ -32,16 +51,17 @@ export function useNotifications() {
     });
 
     // Listen for notifications while the app is in foreground
-    notificationListener.current = Notifications.addNotificationReceivedListener(notification => {
-      console.log('[Notifications] Received in foreground:', notification);
-    });
+    notificationListener.current =
+      Notifications.addNotificationReceivedListener(notification => {
+        console.log('[Notifications] Received in foreground:', notification);
+      });
 
     // Listen for user interactions with notifications
-    responseListener.current = Notifications.addNotificationResponseReceivedListener(response => {
-      const data = response.notification.request.content.data as any;
-      console.log('[Notifications] User interacted with:', data?.type);
-      // We can add navigation logic here if needed
-    });
+    responseListener.current =
+      Notifications.addNotificationResponseReceivedListener(response => {
+        const data = response.notification.request.content.data as any;
+        console.log('[Notifications] User interacted with:', data?.type);
+      });
 
     return () => {
       if (notificationListener.current) {
@@ -54,6 +74,10 @@ export function useNotifications() {
   }, [user]);
 }
 
+/* ──────────────────────────────────────────────────────────
+ * Helpers
+ * ────────────────────────────────────────────────────────── */
+
 async function syncTokenWithBackend(token: string) {
   try {
     await api.post('/notifications/register', { token });
@@ -64,7 +88,9 @@ async function syncTokenWithBackend(token: string) {
 }
 
 async function registerForPushNotificationsAsync() {
-  let token;
+  if (!Notifications || !Device || !Constants) return undefined;
+
+  let token: string | undefined;
 
   if (Platform.OS === 'android') {
     await Notifications.setNotificationChannelAsync('default', {
@@ -83,29 +109,26 @@ async function registerForPushNotificationsAsync() {
       finalStatus = status;
     }
     if (finalStatus !== 'granted') {
-      console.warn('[Notifications] Failed to get push token for push notification!');
-      return;
+      console.warn('[Notifications] Permission not granted.');
+      return undefined;
     }
 
-    // projectID is required for Expo Go and EAS builds
     const projectId =
       Constants?.expoConfig?.extra?.eas?.projectId ??
-      Constants?.easConfig?.projectId;
+      (Constants as any)?.easConfig?.projectId;
 
     if (!projectId) {
-      console.warn('[Notifications] Project ID not found. Ensure you are logged into Expo.');
+      console.warn('[Notifications] Project ID not found.');
     }
 
     try {
-      token = (await Notifications.getExpoPushTokenAsync({
-        projectId,
-      })).data;
+      token = (await Notifications.getExpoPushTokenAsync({ projectId })).data;
       console.log('[Notifications] Expo Push Token:', token);
     } catch (e) {
       console.error('[Notifications] Error getting token:', e);
     }
   } else {
-    console.log('[Notifications] Must use physical device for Push Notifications');
+    console.log('[Notifications] Must use physical device for push notifications.');
   }
 
   return token;

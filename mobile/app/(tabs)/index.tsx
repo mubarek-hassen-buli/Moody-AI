@@ -206,9 +206,7 @@ export default function HomeScreen() {
                 <Text style={styles.userName}>{displayName}</Text>
               </View>
             </View>
-            <Pressable style={styles.bellButton} accessibilityLabel="Notifications">
-              <BellIcon />
-            </Pressable>
+            
           </View>
 
           <Text style={styles.bannerGreeting}>{getGreeting()}</Text>
