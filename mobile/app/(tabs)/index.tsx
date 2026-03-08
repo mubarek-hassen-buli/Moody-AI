@@ -216,7 +216,10 @@ export default function HomeScreen() {
           </Text>
 
           {/* Search bar */}
-          <Pressable style={styles.searchBar}>
+          <Pressable
+            style={styles.searchBar}
+            onPress={() => router.push("/search" as any)}
+          >
             <SearchIcon />
             <Text style={styles.searchPlaceholder}>Search...</Text>
           </Pressable>
