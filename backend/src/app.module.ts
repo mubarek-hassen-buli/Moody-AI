@@ -9,6 +9,7 @@ import { AudioModule } from './modules/audio/audio.module.js';
 import { ChatModule } from './modules/chat/chat.module.js';
 import { CloudinaryModule } from './core/cloudinary/cloudinary.module.js';
 import { QuoteModule } from './modules/quote/quote.module.js';
+import { NotificationModule } from './modules/notification/notification.module.js';
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { QuoteModule } from './modules/quote/quote.module.js';
     ChatModule,
     CloudinaryModule,
     QuoteModule,
+    NotificationModule,
   ],
 })
 export class AppModule {}

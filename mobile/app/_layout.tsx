@@ -1,6 +1,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
+import { useNotifications } from "@/hooks/useNotifications";
 
 /* ──────────────────────────────────────────────────────────
  * Query client
@@ -29,6 +30,7 @@ const queryClient = new QueryClient({
 });
 
 export default function RootLayout() {
+  useNotifications();
   return (
     <QueryClientProvider client={queryClient}>
       <StatusBar style="auto" />
