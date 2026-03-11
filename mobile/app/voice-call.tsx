@@ -6,6 +6,7 @@ import {
   Pressable,
   ActivityIndicator,
   Dimensions,
+  ImageBackground,
 } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -26,6 +27,7 @@ import { Spacing } from "@/constants/spacing";
 import { useVoiceCall } from "@/hooks/useVoiceCall";
 
 const { width } = Dimensions.get("window");
+const pandaBg = require("@/assets/images/panda.jpg");
 
 /* ──────────────────────────────────────────────────────────
  * Components
@@ -107,14 +109,11 @@ export default function VoiceCallScreen() {
         : "Ready";
 
   return (
-    <View style={styles.container}>
+    <ImageBackground source={pandaBg} style={styles.container} resizeMode="cover">
       <StatusBar style="light" />
       
-      {/* Background Overlay */}
-      <View style={StyleSheet.absoluteFillObject} pointerEvents="none">
-        <View style={[styles.gradientTop, { height: "40%" }]} />
-        <View style={[styles.gradientBottom, { height: "60%" }]} />
-      </View>
+      {/* Dark Overlay */}
+      <View style={styles.overlay} />
 
       <View style={[styles.content, { paddingTop: insets.top + Spacing.xl }]}>
         <Text style={styles.title}>Moody AI Voice</Text>
@@ -140,20 +139,17 @@ export default function VoiceCallScreen() {
           </Pressable>
         </View>
       </View>
-    </View>
+    </ImageBackground>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#121212",
   },
-  gradientTop: {
-    backgroundColor: "#1A1A1A",
-  },
-  gradientBottom: {
-    backgroundColor: "#0D0D0D",
+  overlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0, 0, 0, 0.55)",
   },
   content: {
     flex: 1,
