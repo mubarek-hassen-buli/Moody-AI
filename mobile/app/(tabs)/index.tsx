@@ -11,6 +11,7 @@ import { StatusBar } from "expo-status-bar";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Svg, { Path, Circle } from "react-native-svg";
 import * as SecureStore from "expo-secure-store";
+import { useFonts } from "expo-font";
 
 import { useRouter } from "expo-router";
 
@@ -92,6 +93,10 @@ export default function HomeScreen() {
   const [selectorState, setSelectorState] = useState<MoodSelectorState>('idle');
   const createMood = useCreateMood();
   const { data: profile } = useProfile();
+
+  const [fontsLoaded] = useFonts({
+    BradoQuena: require("@/assets/fonts/BradoQuena-Regular.ttf"),
+  });
 
   const displayName = profile?.name ?? "Friend";
   const avatarUrl = profile?.avatarUrl ?? null;
@@ -354,7 +359,9 @@ const styles = StyleSheet.create({
     opacity: 0.8,
   },
   bannerTitle: {
-    ...Typography.hero,
+    fontSize: FontSize.hero,
+    lineHeight: FontSize.hero * 1.2,
+    fontFamily: "BradoQuena",
     color: Colors.textPrimary,
     marginBottom: Spacing.lg,
   },
