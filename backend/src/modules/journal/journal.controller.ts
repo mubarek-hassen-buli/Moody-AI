@@ -14,13 +14,18 @@ import {
 import { SupabaseGuard } from '../../core/auth/supabase.guard.js';
 import { CurrentUser } from '../../core/auth/current-user.decorator.js';
 import { JournalService } from './journal.service.js';
+import { VoiceJournalService } from './voice-journal.service.js';
 import { CreateJournalDto } from './dto/create-journal.dto.js';
 import { UpdateJournalDto } from './dto/update-journal.dto.js';
+import { VoiceJournalDto } from './dto/voice-journal.dto.js';
 
 @Controller('journal')
 @UseGuards(SupabaseGuard)
 export class JournalController {
-  constructor(private readonly journalService: JournalService) {}
+  constructor(
+    private readonly journalService: JournalService,
+    private readonly voiceJournalService: VoiceJournalService,
+  ) {}
 
   /**
    * POST /api/journal
@@ -34,6 +39,24 @@ export class JournalController {
   ) {
     const entry = await this.journalService.create(supabaseUser.id, dto);
     return { data: entry };
+  }
+
+  /**
+   * POST /api/journal/voice
+   * Create a journal entry from a voice recording.
+   * Sends audio to Gemini for transcription, title generation, and mood detection.
+   */
+  @Post('voice')
+  @HttpCode(HttpStatus.CREATED)
+  async createFromVoice(
+    @CurrentUser() supabaseUser: any,
+    @Body() dto: VoiceJournalDto,
+  ) {
+    const result = await this.voiceJournalService.processVoiceEntry(
+      supabaseUser.id,
+      dto.audio,
+    );
+    return { data: result };
   }
 
   /**
@@ -86,3 +109,4 @@ export class JournalController {
     return this.journalService.remove(supabaseUser.id, id);
   }
 }
+

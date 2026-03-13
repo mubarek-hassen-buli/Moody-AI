@@ -55,6 +55,7 @@ export default function JournalScreen() {
   // ── Editor modal state ────────────────────────────────────
   const [editorVisible, setEditorVisible] = useState(false);
   const [editingEntry, setEditingEntry] = useState<JournalEntry | null>(null);
+  const [voiceMode, setVoiceMode] = useState(false);
 
   // ── Delete modal state ────────────────────────────────────
   const [deleteModalVisible, setDeleteModalVisible] = useState(false);
@@ -64,6 +65,13 @@ export default function JournalScreen() {
 
   const handleNewEntry = useCallback(() => {
     setEditingEntry(null);
+    setVoiceMode(false);
+    setEditorVisible(true);
+  }, []);
+
+  const handleVoiceEntry = useCallback(() => {
+    setEditingEntry(null);
+    setVoiceMode(true);
     setEditorVisible(true);
   }, []);
 
@@ -130,18 +138,32 @@ export default function JournalScreen() {
           <Text style={styles.subtitle}>Your personal mood diary</Text>
         </View>
 
-        {/* New entry button */}
-        <Pressable
-          onPress={handleNewEntry}
-          style={({ pressed }) => [
-            styles.newButton,
-            pressed && styles.newButtonPressed,
-          ]}
-          accessibilityRole="button"
-          accessibilityLabel="New journal entry"
-        >
-          <Text style={styles.newButtonText}>+ New</Text>
-        </Pressable>
+        {/* Entry buttons */}
+        <View style={styles.headerButtons}>
+          <Pressable
+            onPress={handleVoiceEntry}
+            style={({ pressed }) => [
+              styles.voiceButton,
+              pressed && styles.newButtonPressed,
+            ]}
+            accessibilityRole="button"
+            accessibilityLabel="Voice journal entry"
+          >
+            <Text style={styles.voiceButtonText}>🎙️ Voice</Text>
+          </Pressable>
+
+          <Pressable
+            onPress={handleNewEntry}
+            style={({ pressed }) => [
+              styles.newButton,
+              pressed && styles.newButtonPressed,
+            ]}
+            accessibilityRole="button"
+            accessibilityLabel="New journal entry"
+          >
+            <Text style={styles.newButtonText}>+ New</Text>
+          </Pressable>
+        </View>
       </View>
 
       {/* ── Body ─────────────────────────────────────────── */}
@@ -200,6 +222,7 @@ export default function JournalScreen() {
       <JournalEditor
         visible={editorVisible}
         entry={editingEntry}
+        voiceMode={voiceMode}
         saving={isSaving}
         onSave={handleSave}
         onClose={handleCloseEditor}
@@ -255,6 +278,24 @@ const styles = StyleSheet.create({
     fontSize: FontSize.sm,
     fontWeight: FontWeight.semibold,
     color: Colors.textInverse,
+  },
+  headerButtons: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.sm,
+  },
+  voiceButton: {
+    backgroundColor: Colors.backgroundSecondary,
+    borderRadius: 20,
+    paddingHorizontal: Spacing.base,
+    paddingVertical: Spacing.sm,
+    borderWidth: 1.5,
+    borderColor: Colors.primary,
+  },
+  voiceButtonText: {
+    fontSize: FontSize.sm,
+    fontWeight: FontWeight.semibold,
+    color: Colors.primary,
   },
   listContent: {
     paddingHorizontal: SCREEN_PADDING,
