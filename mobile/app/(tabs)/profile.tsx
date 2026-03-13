@@ -22,6 +22,7 @@ import { FontSize, FontWeight, Typography } from "@/constants/typography";
 import { BorderRadius, SCREEN_PADDING, Spacing } from "@/constants/spacing";
 import { useAuthStore } from "@/hooks/useAuth";
 import { useProfile, useUpdateProfile } from "@/hooks/useProfile";
+import { useNotificationPermission } from "@/hooks/useNotifications";
 
 /* ──────────────────────────────────────────────────────────
  * Icons
@@ -131,8 +132,8 @@ export default function ProfileScreen() {
   const { data: profile, isLoading: profileLoading } = useProfile();
   const { mutate: updateProfile, isPending: updating } = useUpdateProfile();
 
-  // ── Local UI state ────────────────────────────────────────
-  const [notificationsEnabled, setNotificationsEnabled] = useState(true);
+  // ── Notification permission state ─────────────────────────
+  const { enabled: notificationsEnabled, toggle: toggleNotifications } = useNotificationPermission();
 
   // ── Edit name modal state ─────────────────────────────────
   const [editModalVisible, setEditModalVisible] = useState(false);
@@ -269,7 +270,7 @@ export default function ProfileScreen() {
               rightElement={
                 <Switch
                   value={notificationsEnabled}
-                  onValueChange={setNotificationsEnabled}
+                  onValueChange={toggleNotifications}
                   trackColor={{ false: Colors.borderLight, true: Colors.primary }}
                   thumbColor="#FFFFFF"
                 />
