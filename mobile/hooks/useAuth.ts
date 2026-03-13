@@ -1,7 +1,16 @@
 import { create } from 'zustand';
+import * as SecureStore from 'expo-secure-store';
 import { supabase } from '@/utils/supabase';
+import { queryClient } from '@/app/_layout';
 import api from '@/utils/api';
 import type { Session, User } from '@supabase/supabase-js';
+
+/* ──────────────────────────────────────────────────────────
+ * Constants
+ * ────────────────────────────────────────────────────────── */
+
+/** SecureStore key used by the home screen to track today's mood */
+const MOOD_DATE_KEY = 'moody_daily_mood_date';
 
 /* ──────────────────────────────────────────────────────────
  * Types
@@ -45,6 +54,18 @@ export const useAuthStore = create<AuthState>((set) => {
     }
   };
 
+  /**
+   * Clear all user-specific local data.
+   * Called on sign-out to prevent stale data when switching accounts.
+   */
+  const clearLocalUserData = async () => {
+    // Wipe TanStack Query cache (profiles, moods, journals, quotes, etc.)
+    queryClient.clear();
+
+    // Remove persisted mood-date so the new account can log fresh
+    await SecureStore.deleteItemAsync(MOOD_DATE_KEY).catch(() => {});
+  };
+
   return {
     session: null,
     user: null,
@@ -61,6 +82,7 @@ export const useAuthStore = create<AuthState>((set) => {
         if (error || !user) {
           // Token is invalid or user was deleted — clear everything
           await supabase.auth.signOut();
+          await clearLocalUserData();
           set({ session: null, user: null, initialized: true });
           return;
         }
@@ -94,6 +116,9 @@ export const useAuthStore = create<AuthState>((set) => {
     signUp: async (email, password, name) => {
       set({ loading: true });
       try {
+        // Clear leftover data from any previous account
+        await clearLocalUserData();
+
         const { data, error } = await supabase.auth.signUp({
           email,
           password,
@@ -118,6 +143,9 @@ export const useAuthStore = create<AuthState>((set) => {
     signIn: async (email, password) => {
       set({ loading: true });
       try {
+        // Clear leftover data from any previous account
+        await clearLocalUserData();
+
         const { data, error } = await supabase.auth.signInWithPassword({
           email,
           password,
@@ -141,6 +169,8 @@ export const useAuthStore = create<AuthState>((set) => {
       try {
         const { error } = await supabase.auth.signOut();
         if (error) throw error;
+
+        await clearLocalUserData();
         set({ session: null, user: null });
       } finally {
         set({ loading: false });
@@ -148,3 +178,4 @@ export const useAuthStore = create<AuthState>((set) => {
     },
   };
 });
+

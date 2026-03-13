@@ -17,7 +17,7 @@ import { StatusBar } from "expo-status-bar";
  * React Native architecture (Fabric) used in Expo SDK 54.
  * ────────────────────────────────────────────────────────── */
 
-const queryClient = new QueryClient({
+export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       retry: 2,
