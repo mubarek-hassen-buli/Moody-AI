@@ -18,6 +18,7 @@ import { Button } from "@/components/ui/Button";
 import { TextInput } from "@/components/ui/TextInput";
 import { Divider } from "@/components/ui/Divider";
 import { SocialButton } from "@/components/ui/SocialButton";
+import { useGoogleAuth } from "@/hooks/useGoogleAuth";
 import { Colors } from "@/constants/colors";
 import { Typography, FontSize } from "@/constants/typography";
 import { Spacing, SCREEN_PADDING, BorderRadius } from "@/constants/spacing";
@@ -42,6 +43,7 @@ const ChevronLeftIcon: React.FC = () => (
 export default function LoginScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { signInWithGoogle, loading: googleLoading } = useGoogleAuth();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -60,10 +62,6 @@ export default function LoginScreen() {
       setLoading(false);
     }
   }, [email, password, router]);
-
-  const handleGoogleLogin = useCallback(() => {
-    // TODO: integrate Google OAuth
-  }, []);
 
   return (
     <View style={[styles.root, { paddingTop: insets.top }]}>
@@ -131,7 +129,7 @@ export default function LoginScreen() {
           <Divider />
 
           {/* ── Social buttons ───────────────────────────── */}
-          <SocialButton provider="google" onPress={handleGoogleLogin} />
+          <SocialButton provider="google" onPress={signInWithGoogle} loading={googleLoading} />
 
           {/* ── Privacy policy ────────────────────────────── */}
           <Text style={styles.privacyText}>

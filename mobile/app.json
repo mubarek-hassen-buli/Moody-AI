@@ -12,7 +12,9 @@
       "supportsTablet": true,
       "infoPlist": {
         "NSMicrophoneUsageDescription": "Moody needs microphone access for AI voice calls",
-        "UIBackgroundModes": ["voip"]
+        "UIBackgroundModes": [
+          "voip"
+        ]
       }
     },
     "android": {
@@ -69,7 +71,8 @@
             "deploymentTarget": "15.1"
           }
         }
-      ]
+      ],
+      "expo-web-browser"
     ],
     "experiments": {
       "typedRoutes": true,

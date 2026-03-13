@@ -1,5 +1,6 @@
 import React from "react";
 import {
+  ActivityIndicator,
   Pressable,
   StyleSheet,
   Text,
@@ -22,6 +23,10 @@ interface SocialButtonProps {
   provider: SocialProvider;
   /** Called when the button is pressed. */
   onPress?: () => void;
+  /** Show a loading spinner instead of the icon. */
+  loading?: boolean;
+  /** Disable the button. */
+  disabled?: boolean;
   /** Optional style overrides. */
   style?: ViewStyle;
 }
@@ -75,25 +80,36 @@ const providerConfig: Record<
 export const SocialButton: React.FC<SocialButtonProps> = ({
   provider,
   onPress,
+  loading = false,
+  disabled = false,
   style,
 }) => {
   const { label, Icon } = providerConfig[provider];
+  const isDisabled = disabled || loading;
 
   return (
     <Pressable
       onPress={onPress}
+      disabled={isDisabled}
       style={({ pressed }) => [
         styles.container,
         pressed && styles.pressed,
+        isDisabled && styles.disabled,
         style,
       ]}
       accessibilityRole="button"
       accessibilityLabel={label}
     >
       <View style={styles.iconWrapper}>
-        <Icon />
+        {loading ? (
+          <ActivityIndicator size="small" color={Colors.textSecondary} />
+        ) : (
+          <Icon />
+        )}
       </View>
-      <Text style={styles.label}>{label}</Text>
+      <Text style={styles.label}>
+        {loading ? 'Signing in…' : label}
+      </Text>
     </Pressable>
   );
 };
@@ -125,5 +141,8 @@ const styles = StyleSheet.create({
   label: {
     ...Typography.button,
     color: Colors.textPrimary,
+  },
+  disabled: {
+    opacity: 0.6,
   },
 });

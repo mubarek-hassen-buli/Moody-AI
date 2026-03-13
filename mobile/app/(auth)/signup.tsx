@@ -18,6 +18,7 @@ import { Button } from "@/components/ui/Button";
 import { TextInput } from "@/components/ui/TextInput";
 import { Divider } from "@/components/ui/Divider";
 import { SocialButton } from "@/components/ui/SocialButton";
+import { useGoogleAuth } from "@/hooks/useGoogleAuth";
 import { Colors } from "@/constants/colors";
 import { Typography, FontSize } from "@/constants/typography";
 import { Spacing, SCREEN_PADDING, BorderRadius } from "@/constants/spacing";
@@ -42,6 +43,7 @@ const ChevronLeftIcon: React.FC = () => (
 export default function SignupScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { signInWithGoogle, loading: googleLoading } = useGoogleAuth();
 
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
@@ -66,10 +68,6 @@ export default function SignupScreen() {
       setLoading(false);
     }
   }, [fullName, email, password, isFormValid, router]);
-
-  const handleGoogleSignup = useCallback(() => {
-    // TODO: integrate Google OAuth
-  }, []);
 
   return (
     <View style={[styles.root, { paddingTop: insets.top }]}>
@@ -143,7 +141,7 @@ export default function SignupScreen() {
           <Divider />
 
           {/* ── Social buttons ───────────────────────────── */}
-          <SocialButton provider="google" onPress={handleGoogleSignup} />
+          <SocialButton provider="google" onPress={signInWithGoogle} loading={googleLoading} />
 
           {/* ── Login link ───────────────────────────────── */}
           <View style={styles.loginLinkContainer}>
