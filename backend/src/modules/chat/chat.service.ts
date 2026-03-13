@@ -1,4 +1,4 @@
-import { Inject, Injectable, InternalServerErrorException, Logger, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable, InternalServerErrorException, Logger, NotFoundException } from '@nestjs/common';
 import { eq, desc } from 'drizzle-orm';
 import type { NeonHttpDatabase } from 'drizzle-orm/neon-http';
 import { GoogleGenerativeAI, HarmBlockThreshold, HarmCategory } from '@google/generative-ai';
@@ -15,6 +15,12 @@ const HISTORY_CONTEXT_LIMIT = 20;
 
 /** Number of messages returned to the client for the chat screen */
 const HISTORY_FETCH_LIMIT = 50;
+
+/** Maximum allowed length for a single user message */
+const MAX_MESSAGE_LENGTH = 2000;
+
+/** Timeout for Gemini API calls in milliseconds */
+const GEMINI_TIMEOUT_MS = 15_000;
 
 /**
  * System instruction that keeps Gemini focused on mental-wellness support.
@@ -97,6 +103,16 @@ export class ChatService {
    * 5. Return both the reply text and the saved message records.
    */
   async sendMessage(supabaseUserId: string, userMessage: string) {
+    // ── Validate input ────────────────────────────────────
+    if (!userMessage || userMessage.trim().length === 0) {
+      throw new BadRequestException('Message cannot be empty.');
+    }
+    if (userMessage.length > MAX_MESSAGE_LENGTH) {
+      throw new BadRequestException(
+        `Message too long (${userMessage.length} chars). Maximum is ${MAX_MESSAGE_LENGTH}.`,
+      );
+    }
+
     // Resolve Neon internal user ID from Supabase UUID
     const neonUser = await this.resolveUser(supabaseUserId);
     const neonUserId = neonUser.id;
@@ -139,7 +155,14 @@ export class ChatService {
       });
 
       const chat = model.startChat({ history: geminiHistory });
-      const result = await chat.sendMessage(userMessage);
+
+      const result = await Promise.race([
+        chat.sendMessage(userMessage),
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error('Gemini API timeout')), GEMINI_TIMEOUT_MS),
+        ),
+      ]);
+
       replyText = result.response.text().trim();
 
       if (!replyText) {

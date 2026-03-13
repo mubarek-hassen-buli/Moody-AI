@@ -3,6 +3,7 @@ import {
   ExecutionContext,
   Inject,
   Injectable,
+  Logger,
   UnauthorizedException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -23,6 +24,7 @@ import type * as schema from '../database/schema.js';
  */
 @Injectable()
 export class SupabaseGuard implements CanActivate {
+  private readonly logger = new Logger(SupabaseGuard.name);
   private supabase: SupabaseClient;
 
   constructor(
@@ -62,9 +64,11 @@ export class SupabaseGuard implements CanActivate {
   }
 
   /**
-   * Lightweight find-or-create for the Neon users table.
-   * Runs on every request, but the SELECT is fast (indexed on supabaseId).
-   * Only INSERTs on the very first request from a new user.
+   * Atomic upsert for the Neon users table.
+   *
+   * Uses `onConflictDoNothing` so concurrent first-requests from the
+   * same user never cause a duplicate-key error. This replaces the
+   * earlier check-then-insert pattern that had a race condition.
    */
   private async ensureNeonUser(supabaseUser: {
     id: string;
@@ -80,20 +84,21 @@ export class SupabaseGuard implements CanActivate {
 
       if (existing.length > 0) return; // Already exists — no-op
 
-      console.log(`[SupabaseGuard] Creating Neon user for Supabase ID: ${supabaseUser.id}`);
+      this.logger.log(`Creating Neon user for Supabase ID: ${supabaseUser.id}`);
 
-      await this.db.insert(users).values({
-        supabaseId: supabaseUser.id,
-        email: supabaseUser.email ?? '',
-        name: supabaseUser.user_metadata?.name ?? null,
-        avatarUrl: supabaseUser.user_metadata?.avatar_url ?? null,
-      });
+      await this.db
+        .insert(users)
+        .values({
+          supabaseId: supabaseUser.id,
+          email: supabaseUser.email ?? '',
+          name: supabaseUser.user_metadata?.name ?? null,
+          avatarUrl: supabaseUser.user_metadata?.avatar_url ?? null,
+        })
+        .onConflictDoNothing({ target: users.supabaseId });
 
-      console.log(`[SupabaseGuard] ✅ Neon user created successfully`);
+      this.logger.log('Neon user created successfully');
     } catch (err) {
-      // Race condition: another request may have inserted between SELECT and INSERT.
-      // That's fine — the user exists either way.
-      console.warn('[SupabaseGuard] ensureNeonUser warning:', (err as Error).message);
+      this.logger.warn(`ensureNeonUser warning: ${(err as Error).message}`);
     }
   }
 
@@ -105,4 +110,3 @@ export class SupabaseGuard implements CanActivate {
     return type === 'Bearer' ? token : null;
   }
 }
-
