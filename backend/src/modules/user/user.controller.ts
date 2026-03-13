@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Patch, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Logger, Patch, UseGuards } from '@nestjs/common';
 import { SupabaseGuard } from '../../core/auth/supabase.guard.js';
 import { CurrentUser } from '../../core/auth/current-user.decorator.js';
 import { UserService } from './user.service.js';
@@ -7,6 +7,8 @@ import { UpdateProfileDto } from './dto/update-profile.dto.js';
 @Controller('user')
 @UseGuards(SupabaseGuard)
 export class UserController {
+  private readonly logger = new Logger(UserController.name);
+
   constructor(private readonly userService: UserService) {}
 
   /**
@@ -29,8 +31,7 @@ export class UserController {
     @CurrentUser() supabaseUser: any,
     @Body() dto: UpdateProfileDto,
   ) {
-    console.log('[UserController] PATCH /me called');
-    console.log('[UserController] Body keys:', Object.keys(dto));
+    this.logger.log('Profile update requested');
     const user = await this.userService.updateProfile(supabaseUser.id, dto);
     return { data: user };
   }

@@ -1,5 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { APP_GUARD } from '@nestjs/core';
+import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { DatabaseModule } from './core/database/database.module.js';
 import { AuthModule } from './core/auth/auth.module.js';
 import { UserModule } from './modules/user/user.module.js';
@@ -14,6 +16,10 @@ import { NotificationModule } from './modules/notification/notification.module.j
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
+
+    /* ── Rate limiting: 60 requests per minute per IP ──── */
+    ThrottlerModule.forRoot([{ ttl: 60_000, limit: 60 }]),
+
     DatabaseModule,
     AuthModule,
     UserModule,
@@ -25,5 +31,9 @@ import { NotificationModule } from './modules/notification/notification.module.j
     QuoteModule,
     NotificationModule,
   ],
+  providers: [
+    { provide: APP_GUARD, useClass: ThrottlerGuard },
+  ],
 })
 export class AppModule {}
+
