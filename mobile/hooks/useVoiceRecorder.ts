@@ -1,6 +1,8 @@
 import { useCallback, useRef, useState } from 'react';
-import { Alert, Platform } from 'react-native';
-import { useAudioRecorder, extractAudioData } from '@siteed/expo-audio-studio';
+import { Alert, Linking, Platform } from 'react-native';
+import { Audio } from 'expo-av';
+import * as FileSystem from 'expo-file-system';
+import { useAudioRecorder } from '@siteed/expo-audio-studio';
 import type { AudioRecording, RecordingConfig } from '@siteed/expo-audio-studio';
 
 /* ──────────────────────────────────────────────────────────
@@ -33,6 +35,35 @@ export interface VoiceRecorderResult {
 }
 
 /* ──────────────────────────────────────────────────────────
+ * Helpers
+ * ────────────────────────────────────────────────────────── */
+
+/**
+ * Request microphone permission from the OS.
+ * Returns true if granted, false otherwise.
+ */
+async function ensureMicPermission(): Promise<boolean> {
+  const { status } = await Audio.requestPermissionsAsync();
+
+  if (status === 'granted') return true;
+
+  // Permission denied — guide user to settings
+  Alert.alert(
+    'Microphone Permission Required',
+    'Moody needs microphone access to record voice journal entries. Please enable it in your device settings.',
+    [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Open Settings',
+        onPress: () => Linking.openSettings(),
+      },
+    ],
+  );
+
+  return false;
+}
+
+/* ──────────────────────────────────────────────────────────
  * Hook
  * ────────────────────────────────────────────────────────── */
 
@@ -45,22 +76,23 @@ export interface VoiceRecorderResult {
  * Returns:
  * - `isRecording` — true while recording is active
  * - `durationMs`  — elapsed recording time
- * - `start()`     — begins recording audio
+ * - `start()`     — requests mic permission, then begins recording
  * - `stop()`      — stops and returns base64 audio data
  */
 export function useVoiceRecorder() {
   const recorder = useAudioRecorder();
   const [error, setError] = useState<string | null>(null);
 
-  /** File URI is stored by ref so we can retrieve it on stop. */
-  const fileUriRef = useRef<string | null>(null);
-
   /* ── Start recording ────────────────────────────────── */
   const start = useCallback(async () => {
     try {
       setError(null);
-      const result = await recorder.startRecording(RECORDING_CONFIG);
-      fileUriRef.current = result.fileUri;
+
+      // Request microphone permission before recording
+      const granted = await ensureMicPermission();
+      if (!granted) return;
+
+      await recorder.startRecording(RECORDING_CONFIG);
     } catch (err: any) {
       const message = err?.message ?? 'Failed to start recording';
       setError(message);
@@ -78,20 +110,19 @@ export function useVoiceRecorder() {
         return null;
       }
 
-      /* Extract the raw audio data as base64 from the file */
-      const extracted = await extractAudioData({
-        fileUri: recording.fileUri,
-        includeBase64Data: true,
-        includeWavHeader: true,
-      });
+      // Read the WAV file directly as base64
+      const audioBase64 = await FileSystem.readAsStringAsync(
+        recording.fileUri,
+        { encoding: 'base64' },
+      );
 
-      if (!extracted.base64Data) {
+      if (!audioBase64) {
         setError('Failed to process audio');
         return null;
       }
 
       return {
-        audioBase64: extracted.base64Data,
+        audioBase64,
         durationMs: recording.durationMs,
         mimeType: recording.mimeType ?? 'audio/wav',
       };
