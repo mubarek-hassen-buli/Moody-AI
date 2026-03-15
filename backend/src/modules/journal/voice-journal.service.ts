@@ -18,7 +18,7 @@ import type * as schema from '../../core/database/schema.js';
  * ────────────────────────────────────────────────────────── */
 
 /** Timeout for Gemini API calls (ms) */
-const GEMINI_TIMEOUT_MS = 30_000;
+const GEMINI_TIMEOUT_MS = 60_000;
 
 /** Valid mood values that match our database enum */
 const VALID_MOODS = ['awful', 'bad', 'okay', 'good', 'great'] as const;

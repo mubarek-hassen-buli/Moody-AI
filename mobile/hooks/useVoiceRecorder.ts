@@ -1,7 +1,7 @@
-import { useCallback, useRef, useState } from 'react';
-import { Alert, Linking, Platform } from 'react-native';
+import { useCallback, useState } from 'react';
+import { Alert, Linking } from 'react-native';
 import { Audio } from 'expo-av';
-import * as FileSystem from 'expo-file-system';
+import { File } from 'expo-file-system';
 import { useAudioRecorder } from '@siteed/expo-audio-studio';
 import type { AudioRecording, RecordingConfig } from '@siteed/expo-audio-studio';
 
@@ -110,11 +110,9 @@ export function useVoiceRecorder() {
         return null;
       }
 
-      // Read the WAV file directly as base64
-      const audioBase64 = await FileSystem.readAsStringAsync(
-        recording.fileUri,
-        { encoding: 'base64' },
-      );
+      // Read the WAV file as base64 using the new Expo SDK 54 File API
+      const audioFile = new File(recording.fileUri);
+      const audioBase64 = await audioFile.base64();
 
       if (!audioBase64) {
         setError('Failed to process audio');
