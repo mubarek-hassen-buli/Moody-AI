@@ -1,84 +1,96 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
-import { useRouter, useLocalSearchParams, useGlobalSearchParams } from "expo-router";
-import * as Linking from "expo-linking";
+import { useRouter } from "expo-router";
 import { supabase } from "@/utils/supabase";
-import { queryClient } from "@/app/_layout";
 import { Colors } from "@/constants/colors";
 import { FontSize, Typography } from "@/constants/typography";
 
-/**
- * Auth callback screen.
+/* ──────────────────────────────────────────────────────────
+ * Constants
+ * ────────────────────────────────────────────────────────── */
+
+/** Maximum time to wait for auth state before falling back */
+const AUTH_TIMEOUT_MS = 5_000;
+
+/* ──────────────────────────────────────────────────────────
+ * Auth callback screen
  *
  * Handles the `moody://auth/callback` deep link that Supabase
  * redirects to after Google OAuth.
  *
- * Flow:
- * 1. The app is opened via the deep link with tokens in the URL fragment
- * 2. This screen extracts access_token + refresh_token from the URL
- * 3. Sets the Supabase session
- * 4. Navigates to `/(tabs)`
+ * This screen is a **passive listener** — it does NOT try to
+ * extract tokens from the URL itself. Instead, it waits for
+ * `useGoogleAuth` (which runs in the login screen) to call
+ * `supabase.auth.setSession()`. Once `onAuthStateChange`
+ * fires with a valid session, this screen navigates to /(tabs).
  *
- * This ensures the user always lands on the home screen — even if
- * the `useGoogleAuth` hook already processed the tokens, this
- * screen acts as a safety net.
- */
+ * Why passive?
+ * - On warm start, `Linking.getInitialURL()` returns null
+ * - The `useGoogleAuth` hook already handles token extraction
+ * - Having two systems try to set the session causes races
+ * ────────────────────────────────────────────────────────── */
+
 export default function AuthCallbackScreen() {
   const router = useRouter();
-  const hasProcessed = useRef(false);
+  const hasNavigated = useRef(false);
+  const [status, setStatus] = useState("Signing you in…");
 
   useEffect(() => {
-    if (hasProcessed.current) return;
-    hasProcessed.current = true;
-
-    handleCallback();
-  }, []);
-
-  async function handleCallback() {
-    try {
-      // Get the full URL that opened this screen
-      const url = await Linking.getInitialURL();
-
-      if (url) {
-        // Tokens are in the URL fragment: #access_token=...&refresh_token=...
-        const hashIndex = url.indexOf("#");
-        if (hashIndex !== -1) {
-          const fragment = url.substring(hashIndex + 1);
-          const params = new URLSearchParams(fragment);
-
-          const accessToken = params.get("access_token");
-          const refreshToken = params.get("refresh_token");
-
-          if (accessToken && refreshToken) {
-            // Clear stale data from any previous account
-            queryClient.clear();
-
-            await supabase.auth.setSession({
-              access_token: accessToken,
-              refresh_token: refreshToken,
-            });
-          }
-        }
+    /* ── 1. Check if session already exists ──────────────
+     * useGoogleAuth may have already set the session
+     * before this screen even mounted.
+     * ────────────────────────────────────────────────── */
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session && !hasNavigated.current) {
+        hasNavigated.current = true;
+        router.replace("/(tabs)" as any);
+        return;
       }
+    });
 
-      // Always navigate to home — if tokens were already set by
-      // useGoogleAuth, the session is valid and index.tsx will
-      // redirect to (tabs) anyway.
-      router.replace("/(tabs)" as any);
-    } catch (error) {
-      console.error("[AuthCallback] ❌ Error processing callback:", error);
-      // Fall back to the index screen which will route appropriately
-      router.replace("/");
-    }
-  }
+    /* ── 2. Listen for auth state changes ────────────────
+     * If useGoogleAuth hasn't finished yet, wait for the
+     * SIGNED_IN event from onAuthStateChange.
+     * ────────────────────────────────────────────────── */
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (event, session) => {
+        if (session && !hasNavigated.current) {
+          hasNavigated.current = true;
+          router.replace("/(tabs)" as any);
+        }
+      },
+    );
+
+    /* ── 3. Timeout fallback ─────────────────────────────
+     * If no session appears within the timeout, the user
+     * may have cancelled or something went wrong. Send
+     * them back to the start.
+     * ────────────────────────────────────────────────── */
+    const timeout = setTimeout(() => {
+      if (!hasNavigated.current) {
+        hasNavigated.current = true;
+        setStatus("Taking too long — redirecting…");
+        router.replace("/");
+      }
+    }, AUTH_TIMEOUT_MS);
+
+    return () => {
+      subscription.unsubscribe();
+      clearTimeout(timeout);
+    };
+  }, [router]);
 
   return (
     <View style={styles.container}>
       <ActivityIndicator size="large" color={Colors.primary} />
-      <Text style={styles.text}>Signing you in…</Text>
+      <Text style={styles.text}>{status}</Text>
     </View>
   );
 }
+
+/* ──────────────────────────────────────────────────────────
+ * Styles
+ * ────────────────────────────────────────────────────────── */
 
 const styles = StyleSheet.create({
   container: {

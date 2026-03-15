@@ -116,6 +116,7 @@ export const JournalEditor: React.FC<JournalEditorProps> = ({
   /* ── Voice recording state ─────────────────────────────── */
   const [isVoiceMode, setIsVoiceMode] = useState(false);
   const [detectedMood, setDetectedMood] = useState<DetectedMood | null>(null);
+  const [voiceEntrySaved, setVoiceEntrySaved] = useState(false);
 
   const voiceRecorder = useVoiceRecorder();
   const voiceJournal = useVoiceJournal();
@@ -157,6 +158,7 @@ export const JournalEditor: React.FC<JournalEditorProps> = ({
     if (visible) {
       setIsVoiceMode(initialVoiceMode);
       setDetectedMood(null);
+      setVoiceEntrySaved(false);
     }
   }, [visible, initialVoiceMode]);
 
@@ -166,6 +168,7 @@ export const JournalEditor: React.FC<JournalEditorProps> = ({
       setKeyboardHeight(0);
       setIsVoiceMode(false);
       setDetectedMood(null);
+      setVoiceEntrySaved(false);
       Keyboard.dismiss();
     }
   }, [visible]);
@@ -234,6 +237,10 @@ export const JournalEditor: React.FC<JournalEditorProps> = ({
       setContent(aiEntry.content);
       setDetectedMood(mood);
 
+      // Mark that the backend already saved this entry
+      // so the Save button doesn't create a duplicate
+      setVoiceEntrySaved(true);
+
       // Switch to text mode so user can review & edit
       setIsVoiceMode(false);
     } catch {
@@ -257,6 +264,14 @@ export const JournalEditor: React.FC<JournalEditorProps> = ({
 
   const handleSave = () => {
     if (!isValid || saving) return;
+
+    // Voice entries are already saved by the backend during
+    // transcription. Tapping Save just closes the editor.
+    if (voiceEntrySaved) {
+      onClose();
+      return;
+    }
+
     onSave(title.trim(), content.trim());
   };
 
