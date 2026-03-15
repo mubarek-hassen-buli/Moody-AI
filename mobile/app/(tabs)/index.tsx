@@ -10,7 +10,6 @@ import {
 import { StatusBar } from "expo-status-bar";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Svg, { Path, Circle } from "react-native-svg";
-import * as SecureStore from "expo-secure-store";
 import { useFonts } from "expo-font";
 
 import { useRouter } from "expo-router";
@@ -21,7 +20,7 @@ import { QuoteCard } from "@/components/home/QuoteCard";
 import { Colors } from "@/constants/colors";
 import { Typography, FontSize, FontWeight } from "@/constants/typography";
 import { Spacing, SCREEN_PADDING, BorderRadius } from "@/constants/spacing";
-import { useCreateMood, type MoodLevel, MOOD_KEYS } from "@/hooks/useMood";
+import { useCreateMood, useTodayMood, type MoodLevel, MOOD_KEYS } from "@/hooks/useMood";
 import { JOURNAL_KEYS } from "@/hooks/useJournal";
 import { AUDIO_KEYS } from "@/hooks/useAudio";
 import { useProfile } from "@/hooks/useProfile";
@@ -73,16 +72,6 @@ function getGreeting(): string {
 }
 
 /* ──────────────────────────────────────────────────────────
- * Storage key for daily mood persistence
- * ────────────────────────────────────────────────────────── */
-
-const MOOD_DATE_KEY = 'moody_daily_mood_date';
-
-function getTodayDateString(): string {
-  return new Date().toISOString().slice(0, 10); // e.g. "2026-02-28"
-}
-
-/* ──────────────────────────────────────────────────────────
  * Component
  * ────────────────────────────────────────────────────────── */
 
@@ -93,6 +82,9 @@ export default function HomeScreen() {
   const [selectorState, setSelectorState] = useState<MoodSelectorState>('idle');
   const createMood = useCreateMood();
   const { data: profile } = useProfile();
+
+  /* ── Server source of truth for today's mood ──────────── */
+  const { data: todayMood, isSuccess: todayMoodLoaded } = useTodayMood();
 
   const [fontsLoaded] = useFonts({
     BradoQuena: require("@/assets/fonts/BradoQuena-Regular.ttf"),
@@ -109,18 +101,23 @@ export default function HomeScreen() {
 
   const queryClient = useQueryClient();
 
-  // On mount: check if the user already logged a mood today
+  /* ── Restore mood state from server ─────────────────────
+   * When the server tells us the user already logged today,
+   * we mark the selector as "confirmed" immediately.
+   * This survives sign-out, reinstall, and cache clears.
+   * ────────────────────────────────────────────────────── */
   useEffect(() => {
-    SecureStore.getItemAsync(MOOD_DATE_KEY).then((stored) => {
-      if (stored) {
-        const { date, mood } = JSON.parse(stored);
-        if (date === getTodayDateString()) {
-          setSelectedMood(mood);
-          setSelectorState('confirmed');
-        }
-      }
-    });
-  }, []);
+    if (!todayMoodLoaded) return;
+
+    if (todayMood) {
+      setSelectedMood(todayMood.mood);
+      setSelectorState('confirmed');
+    } else {
+      // No mood logged today — show the picker
+      setSelectedMood(null);
+      setSelectorState('idle');
+    }
+  }, [todayMoodLoaded, todayMood]);
 
   // Prefetch all other tab data in the background as soon as the home
   // screen mounts. This warms TanStack's cache so Journal, Stats, and
@@ -166,12 +163,7 @@ export default function HomeScreen() {
     createMood.mutate(
       { mood: key as MoodLevel },
       {
-        onSuccess: async () => {
-          // Persist today's date + mood choice so the banner survives a restart
-          await SecureStore.setItemAsync(
-            MOOD_DATE_KEY,
-            JSON.stringify({ date: getTodayDateString(), mood: key }),
-          );
+        onSuccess: () => {
           setSelectorState('confirmed');
         },
         onError: () => {

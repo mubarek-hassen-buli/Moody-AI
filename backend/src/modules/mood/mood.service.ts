@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, desc, eq, gte, lte } from 'drizzle-orm';
+import { and, desc, eq, gte, lte, sql } from 'drizzle-orm';
 import type { NeonHttpDatabase } from 'drizzle-orm/neon-http';
 import { DRIZZLE } from '../../core/database/database.module.js';
 import { moodEntries, users } from '../../core/database/schema.js';
@@ -42,12 +42,62 @@ export class MoodService {
   ) {}
 
   /* ─────────────────────────────────────────────────────────
-   * Create a mood entry
+   * Get today's mood entry (or null)
+   * ───────────────────────────────────────────────────────── */
+
+  async getTodayMood(supabaseUserId: string) {
+    const neonUser = await this.resolveUser(supabaseUserId);
+
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+
+    const todayEnd = new Date();
+    todayEnd.setHours(23, 59, 59, 999);
+
+    const entries = await this.db
+      .select()
+      .from(moodEntries)
+      .where(
+        and(
+          eq(moodEntries.userId, neonUser.id),
+          gte(moodEntries.createdAt, todayStart),
+          lte(moodEntries.createdAt, todayEnd),
+        ),
+      )
+      .orderBy(desc(moodEntries.createdAt))
+      .limit(1);
+
+    return entries[0] ?? null;
+  }
+
+  /* ─────────────────────────────────────────────────────────
+   * Create or update today's mood entry (upsert)
+   *
+   * If the user already logged a mood today, update it.
+   * Otherwise, insert a new row.
    * ───────────────────────────────────────────────────────── */
 
   async create(supabaseUserId: string, dto: CreateMoodDto) {
     const neonUser = await this.resolveUser(supabaseUserId);
 
+    // Check if a mood entry already exists for today
+    const existing = await this.getTodayMoodByNeonId(neonUser.id);
+
+    if (existing) {
+      // Update the existing entry instead of creating a duplicate
+      const [updated] = await this.db
+        .update(moodEntries)
+        .set({
+          mood: dto.mood as any,
+          note: dto.note ?? existing.note,
+        })
+        .where(eq(moodEntries.id, existing.id))
+        .returning();
+
+      return updated;
+    }
+
+    // No entry for today — insert a new one
     const [entry] = await this.db
       .insert(moodEntries)
       .values({
@@ -155,6 +205,36 @@ export class MoodService {
       .sort((a, b) => b.percentage - a.percentage);
 
     return { total, breakdown };
+  }
+
+  /* ─────────────────────────────────────────────────────────
+   * Private: get today's mood by Neon user ID
+   *
+   * Internal helper used by create() to avoid a double
+   * resolveUser call.
+   * ───────────────────────────────────────────────────────── */
+
+  private async getTodayMoodByNeonId(neonUserId: string) {
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+
+    const todayEnd = new Date();
+    todayEnd.setHours(23, 59, 59, 999);
+
+    const entries = await this.db
+      .select()
+      .from(moodEntries)
+      .where(
+        and(
+          eq(moodEntries.userId, neonUserId),
+          gte(moodEntries.createdAt, todayStart),
+          lte(moodEntries.createdAt, todayEnd),
+        ),
+      )
+      .orderBy(desc(moodEntries.createdAt))
+      .limit(1);
+
+    return entries[0] ?? null;
   }
 
   /* ─────────────────────────────────────────────────────────

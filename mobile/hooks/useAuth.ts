@@ -1,16 +1,8 @@
 import { create } from 'zustand';
-import * as SecureStore from 'expo-secure-store';
 import { supabase } from '@/utils/supabase';
 import { queryClient } from '@/app/_layout';
 import api from '@/utils/api';
 import type { Session, User } from '@supabase/supabase-js';
-
-/* ──────────────────────────────────────────────────────────
- * Constants
- * ────────────────────────────────────────────────────────── */
-
-/** SecureStore key used by the home screen to track today's mood */
-const MOOD_DATE_KEY = 'moody_daily_mood_date';
 
 /* ──────────────────────────────────────────────────────────
  * Types
@@ -57,13 +49,14 @@ export const useAuthStore = create<AuthState>((set) => {
   /**
    * Clear all user-specific local data.
    * Called on sign-out to prevent stale data when switching accounts.
+   *
+   * NOTE: We only clear the TanStack Query cache here.
+   * Daily mood state is now sourced from the server (GET /mood/today)
+   * so there is no local SecureStore key to clean up.
    */
   const clearLocalUserData = async () => {
     // Wipe TanStack Query cache (profiles, moods, journals, quotes, etc.)
     queryClient.clear();
-
-    // Remove persisted mood-date so the new account can log fresh
-    await SecureStore.deleteItemAsync(MOOD_DATE_KEY).catch(() => {});
   };
 
   return {

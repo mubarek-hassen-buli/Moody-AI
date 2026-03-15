@@ -32,6 +32,17 @@ export class MoodController {
   }
 
   /**
+   * GET /api/mood/today
+   * Returns today's mood entry, or null if not yet logged.
+   * Used by the mobile app to restore mood state after sign-in.
+   */
+  @Get('today')
+  async getToday(@CurrentUser() supabaseUser: any) {
+    const entry = await this.moodService.getTodayMood(supabaseUser.id);
+    return { data: entry };
+  }
+
+  /**
    * GET /api/mood/weekly
    * Returns the last 7 days of mood scores (1-5).
    * Days with no entry have score: null.

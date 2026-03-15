@@ -34,6 +34,7 @@ export interface MoodStats {
  * ────────────────────────────────────────────────────────── */
 
 export const MOOD_KEYS = {
+  today: ['mood', 'today'] as const,
   weekly: ['mood', 'weekly'] as const,
   stats: ['mood', 'stats'] as const,
 };
@@ -42,9 +43,36 @@ export const MOOD_KEYS = {
  * Hooks
  * ────────────────────────────────────────────────────────── */
 
+/** Shape of a mood entry returned from the server. */
+export interface MoodEntry {
+  id: string;
+  userId: string;
+  mood: MoodLevel;
+  note: string | null;
+  createdAt: string;
+}
+
+/**
+ * Fetches today's mood entry from the server.
+ *
+ * This is the **source of truth** for whether the user has
+ * already logged a mood today. Survives sign-out/sign-in,
+ * app reinstalls, and cache clears.
+ */
+export function useTodayMood() {
+  return useQuery<MoodEntry | null>({
+    queryKey: MOOD_KEYS.today,
+    queryFn: async () => {
+      const { data } = await api.get('/mood/today');
+      return data.data ?? null;
+    },
+    staleTime: 5 * 60 * 1000, // 5 minutes
+  });
+}
+
 /**
  * Logs a mood for the current day.
- * On success, invalidates weekly + stats queries so charts refresh.
+ * On success, invalidates today + weekly + stats queries.
  */
 export function useCreateMood() {
   const queryClient = useQueryClient();
@@ -55,6 +83,7 @@ export function useCreateMood() {
       return data;
     },
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: MOOD_KEYS.today });
       queryClient.invalidateQueries({ queryKey: MOOD_KEYS.weekly });
       queryClient.invalidateQueries({ queryKey: MOOD_KEYS.stats });
     },
