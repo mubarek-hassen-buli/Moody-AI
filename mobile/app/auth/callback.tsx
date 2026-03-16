@@ -1,7 +1,7 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
 import { useRouter } from "expo-router";
-import { supabase } from "@/utils/supabase";
+import { useAuthStore } from "@/hooks/useAuth";
 import { Colors } from "@/constants/colors";
 import { FontSize, Typography } from "@/constants/typography";
 
@@ -9,8 +9,8 @@ import { FontSize, Typography } from "@/constants/typography";
  * Constants
  * ────────────────────────────────────────────────────────── */
 
-/** Maximum time to wait for auth state before falling back */
-const AUTH_TIMEOUT_MS = 5_000;
+/** Maximum time to wait for session before falling back */
+const AUTH_TIMEOUT_MS = 8_000;
 
 /* ──────────────────────────────────────────────────────────
  * Auth callback screen
@@ -18,72 +18,49 @@ const AUTH_TIMEOUT_MS = 5_000;
  * Handles the `moody://auth/callback` deep link that Supabase
  * redirects to after Google OAuth.
  *
- * This screen is a **passive listener** — it does NOT try to
- * extract tokens from the URL itself. Instead, it waits for
- * `useGoogleAuth` (which runs in the login screen) to call
- * `supabase.auth.setSession()`. Once `onAuthStateChange`
- * fires with a valid session, this screen navigates to /(tabs).
+ * This screen is a **safety net**. The primary auth handling
+ * happens in `useGoogleAuth`, which extracts tokens from the
+ * URL and updates both Supabase and the Zustand auth store.
  *
- * Why passive?
- * - On warm start, `Linking.getInitialURL()` returns null
- * - The `useGoogleAuth` hook already handles token extraction
- * - Having two systems try to set the session causes races
+ * This screen simply watches the Zustand store:
+ * - When `session` becomes available → navigate to /(tabs)
+ * - If nothing happens within the timeout → fall back to /
+ *
+ * Why watch Zustand instead of Supabase?
+ * Because `(tabs)/_layout.tsx` checks the Zustand store.
+ * Navigating before Zustand updates causes a redirect loop
+ * back to onboarding.
  * ────────────────────────────────────────────────────────── */
 
 export default function AuthCallbackScreen() {
   const router = useRouter();
   const hasNavigated = useRef(false);
-  const [status, setStatus] = useState("Signing you in…");
+  const session = useAuthStore((s) => s.session);
 
+  /* ── Navigate when session appears in Zustand ─────────── */
   useEffect(() => {
-    /* ── 1. Check if session already exists ──────────────
-     * useGoogleAuth may have already set the session
-     * before this screen even mounted.
-     * ────────────────────────────────────────────────── */
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session && !hasNavigated.current) {
-        hasNavigated.current = true;
-        router.replace("/(tabs)" as any);
-        return;
-      }
-    });
+    if (session && !hasNavigated.current) {
+      hasNavigated.current = true;
+      router.replace("/(tabs)" as any);
+    }
+  }, [session, router]);
 
-    /* ── 2. Listen for auth state changes ────────────────
-     * If useGoogleAuth hasn't finished yet, wait for the
-     * SIGNED_IN event from onAuthStateChange.
-     * ────────────────────────────────────────────────── */
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
-        if (session && !hasNavigated.current) {
-          hasNavigated.current = true;
-          router.replace("/(tabs)" as any);
-        }
-      },
-    );
-
-    /* ── 3. Timeout fallback ─────────────────────────────
-     * If no session appears within the timeout, the user
-     * may have cancelled or something went wrong. Send
-     * them back to the start.
-     * ────────────────────────────────────────────────── */
+  /* ── Timeout fallback ─────────────────────────────────── */
+  useEffect(() => {
     const timeout = setTimeout(() => {
       if (!hasNavigated.current) {
         hasNavigated.current = true;
-        setStatus("Taking too long — redirecting…");
         router.replace("/");
       }
     }, AUTH_TIMEOUT_MS);
 
-    return () => {
-      subscription.unsubscribe();
-      clearTimeout(timeout);
-    };
+    return () => clearTimeout(timeout);
   }, [router]);
 
   return (
     <View style={styles.container}>
       <ActivityIndicator size="large" color={Colors.primary} />
-      <Text style={styles.text}>{status}</Text>
+      <Text style={styles.text}>Signing you in…</Text>
     </View>
   );
 }
