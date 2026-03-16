@@ -67,6 +67,18 @@ export const useAuthStore = create<AuthState>((set) => {
 
     initialize: async () => {
       try {
+        // IMPORTANT: Register the auth state change listener FIRST,
+        // before any async checks. This ensures that if another flow
+        // (like Google OAuth) calls setSession() while we're still
+        // initializing, the Zustand store will be updated.
+        supabase.auth.onAuthStateChange((_event, newSession) => {
+          set({ session: newSession, user: newSession?.user ?? null });
+          // Re-sync on token refresh / new sign-in from another flow
+          if (newSession) {
+            syncUserToBackend();
+          }
+        });
+
         // Validate the token against Supabase server, NOT just the local cache.
         // getUser() makes a real HTTP request to verify the token is still valid.
         // If the user was deleted in Supabase, this will return an error.
@@ -92,15 +104,6 @@ export const useAuthStore = create<AuthState>((set) => {
         if (session) {
           await syncUserToBackend();
         }
-
-        // Listen for auth state changes (token refresh, sign out, etc.)
-        supabase.auth.onAuthStateChange((_event, newSession) => {
-          set({ session: newSession, user: newSession?.user ?? null });
-          // Re-sync on token refresh / new sign-in from another flow
-          if (newSession) {
-            syncUserToBackend();
-          }
-        });
       } catch {
         set({ session: null, user: null, initialized: true });
       }
