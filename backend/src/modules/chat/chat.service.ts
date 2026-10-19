@@ -1,9 +1,19 @@
-import { BadRequestException, Inject, Injectable, InternalServerErrorException, Logger, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Inject,
+  Injectable,
+  InternalServerErrorException,
+  Logger,
+} from '@nestjs/common';
 import { eq, desc } from 'drizzle-orm';
 import type { NeonHttpDatabase } from 'drizzle-orm/neon-http';
-import { GoogleGenerativeAI, HarmBlockThreshold, HarmCategory } from '@google/generative-ai';
+import {
+  GoogleGenerativeAI,
+  HarmBlockThreshold,
+  HarmCategory,
+} from '@google/generative-ai';
 import { DRIZZLE } from '../../core/database/database.module.js';
-import { chatMessages, users } from '../../core/database/schema.js';
+import { chatMessages } from '../../core/database/schema.js';
 import type * as schema from '../../core/database/schema.js';
 
 /* ──────────────────────────────────────────────────────────
@@ -22,10 +32,6 @@ const MAX_MESSAGE_LENGTH = 2000;
 /** Timeout for Gemini API calls in milliseconds */
 const GEMINI_TIMEOUT_MS = 15_000;
 
-/**
- * System instruction that keeps Gemini focused on mental-wellness support.
- * This is injected server-side only — never exposed to the client.
- */
 const SYSTEM_INSTRUCTION = `You are Moody, a compassionate and empathetic AI mental wellness companion built into the Moody-AI app.
 
 Your role:
@@ -43,10 +49,6 @@ Rules:
 - Use a warm, friendly tone — not overly clinical
 - Do not break character or discuss your underlying technology
 - If asked about topics unrelated to wellness, gently redirect the conversation`;
-
-/* ──────────────────────────────────────────────────────────
- * Service
- * ────────────────────────────────────────────────────────── */
 
 @Injectable()
 export class ChatService {
@@ -69,13 +71,9 @@ export class ChatService {
    * ────────────────────────────────────────────────────────── */
 
   /**
-   * Returns the last N messages for a user, ordered oldest → newest
-   * so the chat screen can render them in the correct order.
+   * Returns the last N messages for a user, ordered oldest → newest.
    */
-  async getHistory(supabaseUserId: string) {
-    const neonUser = await this.resolveUser(supabaseUserId);
-
-    // Fetch most-recent first, then reverse so the UI gets oldest → newest
+  async getHistory(userId: string) {
     const rows = await this.db
       .select({
         id: chatMessages.id,
@@ -84,26 +82,18 @@ export class ChatService {
         createdAt: chatMessages.createdAt,
       })
       .from(chatMessages)
-      .where(eq(chatMessages.userId, neonUser.id))
+      .where(eq(chatMessages.userId, userId))
       .orderBy(desc(chatMessages.createdAt))
       .limit(HISTORY_FETCH_LIMIT);
 
-    return rows.reverse(); // oldest first for the UI
+    return rows.reverse();
   }
 
   /* ──────────────────────────────────────────────────────────
    * Send message
    * ────────────────────────────────────────────────────────── */
 
-  /**
-   * 1. Persist the user message.
-   * 2. Build conversation history for Gemini context.
-   * 3. Call Gemini and get a reply.
-   * 4. Persist the AI reply.
-   * 5. Return both the reply text and the saved message records.
-   */
-  async sendMessage(supabaseUserId: string, userMessage: string) {
-    // ── Validate input ────────────────────────────────────
+  async sendMessage(userId: string, userMessage: string) {
     if (!userMessage || userMessage.trim().length === 0) {
       throw new BadRequestException('Message cannot be empty.');
     }
@@ -113,28 +103,23 @@ export class ChatService {
       );
     }
 
-    // Resolve Neon internal user ID from Supabase UUID
-    const neonUser = await this.resolveUser(supabaseUserId);
-    const neonUserId = neonUser.id;
-
-    // 1. Save user message first (so it exists even if Gemini fails)
+    // 1. Save user message first
     const [savedUserMsg] = await this.db
       .insert(chatMessages)
-      .values({ userId: neonUserId, content: userMessage, role: 'user' })
+      .values({ userId, content: userMessage, role: 'user' })
       .returning();
 
-    // 2. Fetch recent history for context (excludes the message we just saved)
+    // 2. Fetch recent history for context
     const recentHistory = await this.db
       .select({ content: chatMessages.content, role: chatMessages.role })
       .from(chatMessages)
-      .where(eq(chatMessages.userId, neonUserId))
+      .where(eq(chatMessages.userId, userId))
       .orderBy(desc(chatMessages.createdAt))
-      .limit(HISTORY_CONTEXT_LIMIT + 1); // +1 because the user msg was just inserted
+      .limit(HISTORY_CONTEXT_LIMIT + 1);
 
-    // Build Gemini chat history (exclude the latest user message — we send it separately)
     const geminiHistory = recentHistory
       .reverse()
-      .slice(0, -1) // remove the last entry (the message we just saved)
+      .slice(0, -1)
       .map((msg) => ({
         role: msg.role === 'user' ? ('user' as const) : ('model' as const),
         parts: [{ text: msg.content }],
@@ -176,7 +161,7 @@ export class ChatService {
     // 4. Persist AI reply
     const [savedAiMsg] = await this.db
       .insert(chatMessages)
-      .values({ userId: neonUserId, content: replyText, role: 'ai' })
+      .values({ userId, content: replyText, role: 'ai' })
       .returning();
 
     return {
@@ -193,29 +178,5 @@ export class ChatService {
         createdAt: savedAiMsg.createdAt,
       },
     };
-  }
-
-  /* ──────────────────────────────────────────────────────────
-   * Private: resolve Neon user from Supabase UUID
-   *
-   * The `chat_messages.user_id` column is a FK referencing
-   * `users.id` (Neon's auto-generated UUID), NOT `users.supabase_id`.
-   * Every service must call this before any DB write.
-   * ────────────────────────────────────────────────────────── */
-
-  private async resolveUser(supabaseId: string) {
-    const result = await this.db
-      .select()
-      .from(users)
-      .where(eq(users.supabaseId, supabaseId))
-      .limit(1);
-
-    if (!result[0]) {
-      throw new NotFoundException(
-        'User account not found in database. Please log in again.',
-      );
-    }
-
-    return result[0];
   }
 }

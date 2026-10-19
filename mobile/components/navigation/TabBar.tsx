@@ -96,6 +96,92 @@ const INNER_GAP        = 5;    // gap between pills
 const SEGMENT_WIDTH    = 278;  // total width of the gooey container
 
 /* ──────────────────────────────────────────────────────────
+ * TabBarItem
+ * ────────────────────────────────────────────────────────── */
+
+interface TabBarItemProps {
+  route: any;
+  index: number;
+  isFocused: boolean;
+  navigation: any;
+  activeIndex: { value: number };
+}
+
+function TabBarItem({
+  route,
+  index,
+  isFocused,
+  navigation,
+  activeIndex,
+}: TabBarItemProps) {
+  const label = TAB_LABELS[route.name] ?? route.name;
+  const Icon = TAB_ICONS[route.name] ?? HomeIcon;
+
+  const onPress = () => {
+    const event = navigation.emit({
+      type: "tabPress",
+      target: route.key,
+      canPreventDefault: true,
+    });
+    if (!isFocused && !event.defaultPrevented) {
+      navigation.navigate(route.name);
+    }
+  };
+
+  const itemStyle = useAnimatedStyle(() => {
+    const inputRange = [0, 1, 2, 3];
+    const widths = [0, 1, 2, 3].map((j) =>
+      j === index ? EXPANDED_WIDTH : ICON_SIZE
+    );
+    const w = interpolate(activeIndex.value, inputRange, widths);
+
+    const allWidths = [0, 1, 2, 3].map((j) => {
+      const out = [0, 1, 2, 3].map((k) => (k === j ? EXPANDED_WIDTH : ICON_SIZE));
+      return interpolate(activeIndex.value, inputRange, out);
+    });
+
+    let x = 8;
+    for (let k = 0; k < index; k++) {
+      x += allWidths[k] + INNER_GAP;
+    }
+
+    return {
+      width: w,
+      left: x,
+    };
+  });
+
+  const textStyle = useAnimatedStyle(() => {
+    const progress = interpolate(
+      activeIndex.value,
+      [index - 1, index, index + 1],
+      [-1, 1, -1],
+      "clamp"
+    );
+    const isActive = Math.max(0, progress);
+    return {
+      opacity: withTiming(isActive > 0.5 ? 1 : 0, { duration: 200 }),
+      transform: [{ translateX: interpolate(isActive, [0, 1], [-8, 0]) }],
+    };
+  });
+
+  return (
+    <Animated.View style={[styles.tabItem, itemStyle]}>
+      <Pressable onPress={onPress} style={styles.pressableFill}>
+        <View style={styles.iconWrapper}>
+          <Icon color={isFocused ? ICON_ACTIVE : ICON_INACTIVE} />
+        </View>
+        <Animated.View style={[styles.labelWrapper, textStyle]} pointerEvents="none">
+          <Text style={styles.labelText} numberOfLines={1}>
+            {label}
+          </Text>
+        </Animated.View>
+      </Pressable>
+    </Animated.View>
+  );
+}
+
+/* ──────────────────────────────────────────────────────────
  * CustomTabBar
  * ────────────────────────────────────────────────────────── */
 
@@ -111,35 +197,6 @@ export function CustomTabBar({ state, descriptors, navigation }: BottomTabBarPro
       damping: 14, stiffness: 120, mass: 0.8,
     });
   }, [state.index, activeIndex]);
-
-  /* ── Derived item widths and positions ─────────────────── */
-
-  const NUM_TABS = 4;
-
-  // For each tab, compute its animated width & left position
-  const tabItems = Array.from({ length: NUM_TABS }, (_, i) =>
-    useDerivedValue(() => {
-      // Widths for all 4 tabs at each active index
-      const inputRange  = [0, 1, 2, 3];
-      const widths = [0, 1, 2, 3].map((j) =>
-        j === i ? EXPANDED_WIDTH : ICON_SIZE
-      );
-      const w = interpolate(activeIndex.value, inputRange, widths);
-
-      // Compute positions left-to-right from width sequence
-      const allWidths = [0, 1, 2, 3].map((j) => {
-        const out = [0, 1, 2, 3].map((k) => k === j ? EXPANDED_WIDTH : ICON_SIZE);
-        return interpolate(activeIndex.value, inputRange, out);
-      });
-
-      let x = 8; // left padding
-      for (let k = 0; k < i; k++) {
-        x += allWidths[k] + INNER_GAP;
-      }
-
-      return { w, x };
-    })
-  );
 
   /* ── Animated gooey background ─────────────────────────── */
 
@@ -214,54 +271,16 @@ export function CustomTabBar({ state, descriptors, navigation }: BottomTabBarPro
           <AnimatedPath animatedProps={animatedProps} fill={BG_DARK} />
         </Svg>
 
-        {state.routes.map((route, index) => {
-          const label    = TAB_LABELS[route.name] ?? route.name;
-          const isFocused = state.index === index;
-          const Icon     = TAB_ICONS[route.name] ?? HomeIcon;
-
-          const onPress = () => {
-            const event = navigation.emit({
-              type: "tabPress",
-              target: route.key,
-              canPreventDefault: true,
-            });
-            if (!isFocused && !event.defaultPrevented) {
-              navigation.navigate(route.name);
-            }
-          };
-
-          const itemStyle = useAnimatedStyle(() => ({
-            width: tabItems[index].value.w,
-            left: tabItems[index].value.x,
-          }));
-
-          const textStyle = useAnimatedStyle(() => {
-            const progress = interpolate(
-              activeIndex.value,
-              [index - 1, index, index + 1],
-              [-1, 1, -1],
-              "clamp"
-            );
-            const isActive = Math.max(0, progress);
-            return {
-              opacity: withTiming(isActive > 0.5 ? 1 : 0, { duration: 200 }),
-              transform: [{ translateX: interpolate(isActive, [0, 1], [-8, 0]) }],
-            };
-          });
-
-          return (
-            <Animated.View key={route.key} style={[styles.tabItem, itemStyle]}>
-              <Pressable onPress={onPress} style={styles.pressableFill}>
-                <View style={styles.iconWrapper}>
-                  <Icon color={isFocused ? ICON_ACTIVE : ICON_INACTIVE} />
-                </View>
-                <Animated.View style={[styles.labelWrapper, textStyle]} pointerEvents="none">
-                  <Text style={styles.labelText} numberOfLines={1}>{label}</Text>
-                </Animated.View>
-              </Pressable>
-            </Animated.View>
-          );
-        })}
+        {state.routes.map((route, index) => (
+          <TabBarItem
+            key={route.key}
+            route={route}
+            index={index}
+            isFocused={state.index === index}
+            navigation={navigation}
+            activeIndex={activeIndex}
+          />
+        ))}
       </View>
 
       {/* ── Floating Action Button ────────────────────────────── */}

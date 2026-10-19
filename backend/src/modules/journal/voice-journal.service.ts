@@ -4,13 +4,11 @@ import {
   Injectable,
   InternalServerErrorException,
   Logger,
-  NotFoundException,
 } from '@nestjs/common';
 import { GoogleGenerativeAI, Part } from '@google/generative-ai';
-import { eq } from 'drizzle-orm';
 import type { NeonHttpDatabase } from 'drizzle-orm/neon-http';
 import { DRIZZLE } from '../../core/database/database.module.js';
-import { journalEntries, users } from '../../core/database/schema.js';
+import { journalEntries } from '../../core/database/schema.js';
 import type * as schema from '../../core/database/schema.js';
 
 /* ──────────────────────────────────────────────────────────
@@ -20,14 +18,10 @@ import type * as schema from '../../core/database/schema.js';
 /** Timeout for Gemini API calls (ms) */
 const GEMINI_TIMEOUT_MS = 60_000;
 
-/** Valid mood values that match our database enum */
+/** Valid mood values matching our database enum */
 const VALID_MOODS = ['awful', 'bad', 'okay', 'good', 'great'] as const;
 type MoodLevel = (typeof VALID_MOODS)[number];
 
-/**
- * Prompt that instructs Gemini to transcribe audio,
- * clean the text, generate a title, and detect the mood.
- */
 const VOICE_JOURNAL_PROMPT = `You are Moody, a mental wellness AI. A user just recorded a voice journal entry.
 
 Your job:
@@ -38,10 +32,6 @@ Your job:
 
 Respond ONLY with valid JSON in this exact format (no markdown, no code fences):
 {"title": "...", "content": "...", "mood": "..."}`;
-
-/* ──────────────────────────────────────────────────────────
- * Service
- * ────────────────────────────────────────────────────────── */
 
 @Injectable()
 export class VoiceJournalService {
@@ -65,15 +55,7 @@ export class VoiceJournalService {
    * Process voice journal
    * ────────────────────────────────────────────────────────── */
 
-  /**
-   * Accept a base64-encoded audio recording, send it to Gemini
-   * for transcription + mood detection, and save the result
-   * as a journal entry.
-   */
-  async processVoiceEntry(supabaseUserId: string, audioBase64: string) {
-    const neonUser = await this.resolveUser(supabaseUserId);
-
-    /* ── Prepare the audio for Gemini ──────────────────── */
+  async processVoiceEntry(userId: string, audioBase64: string) {
     const { mimeType, data } = this.parseAudioData(audioBase64);
 
     const audioPart: Part = {
@@ -84,7 +66,6 @@ export class VoiceJournalService {
       text: VOICE_JOURNAL_PROMPT,
     };
 
-    /* ── Call Gemini ───────────────────────────────────── */
     let geminiResponse: string;
     try {
       const model = this.genAI.getGenerativeModel({
@@ -109,20 +90,20 @@ export class VoiceJournalService {
       );
     }
 
-    /* ── Parse the structured response ────────────────── */
     const { title, content, mood } = this.parseGeminiResponse(geminiResponse);
 
-    /* ── Save the journal entry ───────────────────────── */
+    // Save the journal entry along with the detected mood directly
     const [entry] = await this.db
       .insert(journalEntries)
       .values({
-        userId: neonUser.id,
+        userId,
         title,
         content,
+        detectedMood: mood as any,
       })
       .returning();
 
-    this.logger.log(`Voice journal saved: "${title}" (mood: ${mood})`);
+    this.logger.log(`Voice journal saved: "${title}" (mood: ${mood}) for user ${userId}`);
 
     return {
       entry,
@@ -130,14 +111,6 @@ export class VoiceJournalService {
     };
   }
 
-  /* ──────────────────────────────────────────────────────────
-   * Private helpers
-   * ────────────────────────────────────────────────────────── */
-
-  /**
-   * Extract the MIME type and raw base64 data from the input.
-   * Handles both data-URI format and raw base64.
-   */
   private parseAudioData(audioBase64: string): {
     mimeType: string;
     data: string;
@@ -150,21 +123,15 @@ export class VoiceJournalService {
       return { mimeType: dataUriMatch[1], data: dataUriMatch[2] };
     }
 
-    // Default to WAV if no data URI prefix is provided
     return { mimeType: 'audio/wav', data: audioBase64 };
   }
 
-  /**
-   * Parse and validate the JSON response from Gemini.
-   * Falls back gracefully if the response is malformed.
-   */
   private parseGeminiResponse(raw: string): {
     title: string;
     content: string;
     mood: MoodLevel;
   } {
     try {
-      // Strip markdown code fences if Gemini wraps the JSON
       const cleaned = raw
         .replace(/^```(?:json)?\s*\n?/i, '')
         .replace(/\n?```\s*$/i, '')
@@ -201,24 +168,5 @@ export class VoiceJournalService {
         'Could not process the audio. Please try again.',
       );
     }
-  }
-
-  /**
-   * Resolve the Neon internal user from a Supabase UUID.
-   */
-  private async resolveUser(supabaseId: string) {
-    const result = await this.db
-      .select()
-      .from(users)
-      .where(eq(users.supabaseId, supabaseId))
-      .limit(1);
-
-    if (!result[0]) {
-      throw new NotFoundException(
-        'User account not found. Please log in again.',
-      );
-    }
-
-    return result[0];
   }
 }

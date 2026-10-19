@@ -35,10 +35,10 @@ Moody AI is an intelligent, beautifully designed mood tracker and mental wellnes
 - **Framework:** NestJS (TypeScript)
 - **Database:** PostgreSQL (hosted on Neon)
 - **ORM:** Drizzle ORM
-- **Authentication:** Supabase Auth (JWT)
+- **Authentication:** Neon Auth (Better Auth / EdDSA JWKS)
+- **Object Storage:** Neon Object Storage (S3-compatible bucket)
 - **Integrations:**
-  - **Gemini AI API:** AI companion text chats
-  - **Cloudinary:** Media upload & storage
+  - **Gemini AI API:** AI companion text chats & voice analysis
   - **Expo Server SDK:** Push notification delivery
 
 ---
@@ -48,9 +48,8 @@ Moody AI is an intelligent, beautifully designed mood tracker and mental wellnes
 ### Prerequisites
 - Node.js (v20+)
 - Expo CLI
-- A PostgreSQL Database (e.g., Neon)
-- Supabase Project (for Auth)
-- API Keys: Gemini, Vapi, Cloudinary
+- Neon Project (with PostgreSQL, Neon Auth, and Object Storage enabled)
+- API Keys: Gemini, Vapi
 
 ### 1. Backend Setup
 
@@ -61,20 +60,26 @@ npm install
 
 Create a `.env` file in the `backend` directory:
 ```env
+PORT=3000
 DATABASE_URL=your_neon_db_url
-SUPABASE_URL=your_supabase_url
-SUPABASE_ANON_KEY=your_supabase_anon_key
+NEON_AUTH_URL=your_neon_auth_url
+NEON_AUTH_JWKS_URL=your_neon_auth_jwks_url
 GEMINI_API_KEY=your_gemini_key
 GEMINI_API_KEY_VOICE=your_gemini_voice_key
-CLOUDINARY_CLOUD_NAME=your_cloudinary_name
-CLOUDINARY_API_KEY=your_cloudinary_key
-CLOUDINARY_API_SECRET=your_cloudinary_secret
+NEON_STORAGE_BUCKET=assets
+AWS_REGION=us-east-2
+AWS_ENDPOINT_URL_S3=your_neon_s3_endpoint
+AWS_ACCESS_KEY_ID=your_access_key
+AWS_SECRET_ACCESS_KEY=your_secret_key
 ```
 
-Start the backend server:
+Run database migration & seed:
 ```bash
-# Push database schema
-npx drizzle-kit push
+# Run migration
+npx tsx scripts/migrate.ts
+
+# Seed audio tracks
+npx tsx scripts/seed-audio.ts
 
 # Start development server
 npm run start:dev
@@ -89,8 +94,7 @@ npm install
 
 Create a `.env` file in the `mobile` directory:
 ```env
-EXPO_PUBLIC_SUPABASE_URL=your_supabase_url
-EXPO_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+EXPO_PUBLIC_NEON_AUTH_URL=your_neon_auth_url
 EXPO_PUBLIC_API_URL=http://your-local-ip:3000/api
 EXPO_PUBLIC_VAPI_PUBLIC_KEY=your_vapi_public_key
 EXPO_PUBLIC_VAPI_ASSISTANT_ID=your_vapi_assistant_id

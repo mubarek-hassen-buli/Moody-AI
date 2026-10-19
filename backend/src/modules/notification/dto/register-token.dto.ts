@@ -1,11 +1,11 @@
-import { IsNotEmpty, IsString } from 'class-validator';
+import { z } from 'zod';
+import { createZodDto } from 'nestjs-zod';
 
-export class RegisterTokenDto {
-  /**
-   * The Expo Push Token generated on the mobile device.
-   * Example: ExponentPushToken[xxxxxxxxxxxxxxxxxxxxxx]
-   */
-  @IsString()
-  @IsNotEmpty()
-  token: string;
-}
+const registerTokenSchema = z.object({
+  token: z
+    .string({ message: 'Token is required' })
+    .trim()
+    .min(1, 'Token cannot be empty'),
+});
+
+export class RegisterTokenDto extends createZodDto(registerTokenSchema) {}

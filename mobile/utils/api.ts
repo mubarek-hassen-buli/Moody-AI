@@ -1,32 +1,39 @@
 import axios from 'axios';
-import { supabase } from '@/utils/supabase';
+import { authClient } from '@/utils/auth-client';
 
 /**
  * Pre-configured Axios instance for the Moody-AI NestJS backend.
  *
- * Automatically attaches the Supabase JWT to every request.
- * Gets the token directly from the Supabase client to avoid
- * circular dependency with useAuth.
- *
- * Update `baseURL` to your deployed backend URL when ready.
+ * Automatically attaches the Neon Auth (Better Auth) session token to every request.
  */
 const api = axios.create({
-  // On Android `localhost` resolves to the device itself, not your PC.
-  // Use your machine's LAN IP for local development.
-  // Set EXPO_PUBLIC_API_URL in .env to override (e.g. for production).
-  baseURL: process.env.EXPO_PUBLIC_API_URL ?? 'http://192.168.9.32:3000/api',
+  baseURL: process.env.EXPO_PUBLIC_API_URL ?? 'http://192.168.1.50:3000/api',
   timeout: 15000,
   headers: {
     'Content-Type': 'application/json',
   },
 });
 
-// Request interceptor — attach Supabase access token
+// Request interceptor — attach Neon Auth session token and cookie
 api.interceptors.request.use(async (config) => {
-  const { data: { session } } = await supabase.auth.getSession();
-  if (session?.access_token) {
-    config.headers.Authorization = `Bearer ${session.access_token}`;
+  try {
+    const { data } = await authClient.getSession();
+    const token = data?.session?.token;
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+
+    // Also forward stored cookie if available on expo client
+    if (typeof (authClient as any).getCookie === 'function') {
+      const cookie = await (authClient as any).getCookie();
+      if (cookie) {
+        config.headers.Cookie = cookie;
+      }
+    }
+  } catch (err) {
+    // Session fetching failed or offline
   }
+
   return config;
 });
 

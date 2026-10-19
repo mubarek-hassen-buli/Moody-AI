@@ -1,35 +1,35 @@
 import { Body, Controller, Get, Post, UseGuards } from '@nestjs/common';
-import { SupabaseGuard } from '../../core/auth/supabase.guard.js';
+import { NeonAuthGuard } from '../../core/auth/neon-auth.guard.js';
+import type { AuthenticatedUser } from '../../core/auth/neon-auth.guard.js';
 import { CurrentUser } from '../../core/auth/current-user.decorator.js';
 import { ChatService } from './chat.service.js';
 import { SendMessageDto } from './dto/send-message.dto.js';
 
 @Controller('chat')
-@UseGuards(SupabaseGuard)
+@UseGuards(NeonAuthGuard)
 export class ChatController {
   constructor(private readonly chatService: ChatService) {}
 
   /**
    * GET /api/chat/history
-   * Returns the conversation history for the authenticated user.
+   * Returns conversation history for the authenticated user.
    */
   @Get('history')
-  async getHistory(@CurrentUser() supabaseUser: any) {
-    const messages = await this.chatService.getHistory(supabaseUser.id);
+  async getHistory(@CurrentUser() user: AuthenticatedUser) {
+    const messages = await this.chatService.getHistory(user.id);
     return { data: messages };
   }
 
   /**
    * POST /api/chat/send
    * Sends a user message to Gemini and returns the AI reply.
-   * Body: { message: string }
    */
   @Post('send')
   async sendMessage(
-    @CurrentUser() supabaseUser: any,
+    @CurrentUser() user: AuthenticatedUser,
     @Body() dto: SendMessageDto,
   ) {
-    const result = await this.chatService.sendMessage(supabaseUser.id, dto.message);
+    const result = await this.chatService.sendMessage(user.id, dto.message);
     return { data: result };
   }
 }

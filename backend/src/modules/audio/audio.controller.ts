@@ -4,12 +4,12 @@ import {
   Param,
   UseGuards,
 } from '@nestjs/common';
-import { SupabaseGuard } from '../../core/auth/supabase.guard.js';
+import { NeonAuthGuard } from '../../core/auth/neon-auth.guard.js';
 import { AudioService } from './audio.service.js';
 import { GetAudioByCategoryDto } from './dto/get-audio.dto.js';
 
 @Controller('audio')
-@UseGuards(SupabaseGuard)
+@UseGuards(NeonAuthGuard)
 export class AudioController {
   constructor(private readonly audioService: AudioService) {}
 

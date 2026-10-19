@@ -7,7 +7,7 @@ import { Colors } from "@/constants/colors";
 /**
  * App entry point.
  *
- * Checks for an existing Supabase session:
+ * Checks for an existing Neon Auth session:
  * - If authenticated → redirect to the main tab navigator.
  * - If not → redirect to onboarding.
  */

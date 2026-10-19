@@ -1,40 +1,85 @@
 import 'dotenv/config';
+import './neon-dispatcher.js';
 import { neon } from '@neondatabase/serverless';
 import { drizzle } from 'drizzle-orm/neon-http';
-import * as schema from '../src/core/database/schema';
+import * as schema from '../src/core/database/schema.js';
 
 const sql = neon(process.env.DATABASE_URL!);
 const db = drizzle(sql, { schema });
 
-const urls = [
-  'https://ygkepuokloqilxrbxbql.supabase.co/storage/v1/object/public/audio-sessions/In-Pursuit%20-%20Siine.mp3',
-  'https://ygkepuokloqilxrbxbql.supabase.co/storage/v1/object/public/audio-sessions/Into-the-Night%20-%20Hallmore.mp3',
-  'https://ygkepuokloqilxrbxbql.supabase.co/storage/v1/object/public/audio-sessions/Pose%20-%20ALICE.mp3',
-  'https://ygkepuokloqilxrbxbql.supabase.co/storage/v1/object/public/audio-sessions/Supernovas%20-%20Hallman.mp3',
-  'https://ygkepuokloqilxrbxbql.supabase.co/storage/v1/object/public/audio-sessions/Ur-Face%20-%20LeDorean.mp3',
-  'https://ygkepuokloqilxrbxbql.supabase.co/storage/v1/object/public/audio-sessions/MENTAL%20-%20Manuelo%20Jersey.mp3'
+const s3Endpoint = process.env.AWS_ENDPOINT_URL_S3 || 'https://ep-weathered-flower-b4mcbnhk.storage.c-6.us-east-2.aws.neon.tech';
+const bucket = process.env.NEON_STORAGE_BUCKET || 'assets';
+
+// Neon Object Storage base URL for assets
+const storageBaseUrl = `${s3Endpoint}/${bucket}/audio-tracks`;
+
+const tracks = [
+  {
+    title: 'In Pursuit - Siine',
+    duration: '3:00',
+    category: 'workout' as const,
+    filename: 'In-Pursuit - Siine.mp3',
+  },
+  {
+    title: 'Into the Night - Hallmore',
+    duration: '3:00',
+    category: 'workout' as const,
+    filename: 'Into-the-Night - Hallmore.mp3',
+  },
+  {
+    title: 'Pose - ALICE',
+    duration: '3:00',
+    category: 'workout' as const,
+    filename: 'Pose - ALICE.mp3',
+  },
+  {
+    title: 'Supernovas - Hallman',
+    duration: '3:00',
+    category: 'workout' as const,
+    filename: 'Supernovas - Hallman.mp3',
+  },
+  {
+    title: 'Ur Face - LeDorean',
+    duration: '3:00',
+    category: 'workout' as const,
+    filename: 'Ur-Face - LeDorean.mp3',
+  },
+  {
+    title: 'MENTAL - Manuelo Jersey',
+    duration: '3:00',
+    category: 'workout' as const,
+    filename: 'MENTAL - Manuelo Jersey.mp3',
+  },
+  {
+    title: 'Deep Meditation & Gentle Waves',
+    duration: '5:00',
+    category: 'relaxing' as const,
+    filename: 'Deep-Meditation.mp3',
+  },
+  {
+    title: 'Forest Rain & Calm Mind',
+    duration: '4:30',
+    category: 'relaxing' as const,
+    filename: 'Forest-Rain.mp3',
+  },
 ];
 
 async function seed() {
-  console.log('🚀 Starting workout audio seed process...');
+  console.log('🚀 Starting audio seed process for Neon Storage...');
   
-  for (const url of urls) {
-    const rawFilename = url.split('/').pop() || '';
-    // Decode the URI component (%20 to space, etc) and remove the .mp3 extension
-    let title = decodeURIComponent(rawFilename).replace('.mp3', '');
-    
-    console.log(`Inserting: "${title}"`);
+  for (const track of tracks) {
+    const audioUrl = `${storageBaseUrl}/${encodeURIComponent(track.filename)}`;
+    console.log(`Seeding track [${track.category}]: "${track.title}" -> ${audioUrl}`);
     
     await db.insert(schema.audioTracks).values({
-      title,
-      // Author column is optional in the Drizzle schema, so we omit it
-      duration: '3:00', // As per user request, all new ones are 3 minutes
-      category: 'workout',
-      audioUrl: url,
+      title: track.title,
+      duration: track.duration,
+      category: track.category,
+      audioUrl,
     });
   }
   
-  console.log('✅ Successfully seeded all workout audio tracks to Neon Database!');
+  console.log('✅ Successfully seeded audio tracks to Neon Database!');
   process.exit(0);
 }
 

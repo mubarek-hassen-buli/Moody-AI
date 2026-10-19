@@ -1,11 +1,12 @@
 import { Body, Controller, Get, Logger, Patch, UseGuards } from '@nestjs/common';
-import { SupabaseGuard } from '../../core/auth/supabase.guard.js';
+import { NeonAuthGuard } from '../../core/auth/neon-auth.guard.js';
+import type { AuthenticatedUser } from '../../core/auth/neon-auth.guard.js';
 import { CurrentUser } from '../../core/auth/current-user.decorator.js';
 import { UserService } from './user.service.js';
 import { UpdateProfileDto } from './dto/update-profile.dto.js';
 
 @Controller('user')
-@UseGuards(SupabaseGuard)
+@UseGuards(NeonAuthGuard)
 export class UserController {
   private readonly logger = new Logger(UserController.name);
 
@@ -13,26 +14,25 @@ export class UserController {
 
   /**
    * GET /api/user/me
-   * Returns the current user's profile.
-   * If the user doesn't exist in Neon yet, creates them automatically.
+   * Returns the current user's profile from Neon DB.
    */
   @Get('me')
-  async getProfile(@CurrentUser() supabaseUser: any) {
-    const user = await this.userService.upsertFromSupabase(supabaseUser);
-    return { data: user };
+  async getProfile(@CurrentUser() user: AuthenticatedUser) {
+    const profile = await this.userService.findById(user.id);
+    return { data: profile };
   }
 
   /**
    * PATCH /api/user/me
-   * Updates the current user's profile (name and/or avatar).
+   * Updates the current user's profile (name and/or avatar stored in Neon Object Storage).
    */
   @Patch('me')
   async updateProfile(
-    @CurrentUser() supabaseUser: any,
+    @CurrentUser() user: AuthenticatedUser,
     @Body() dto: UpdateProfileDto,
   ) {
-    this.logger.log('Profile update requested');
-    const user = await this.userService.updateProfile(supabaseUser.id, dto);
-    return { data: user };
+    this.logger.log(`Profile update requested for user: ${user.id}`);
+    const updated = await this.userService.updateProfile(user.id, dto);
+    return { data: updated };
   }
 }

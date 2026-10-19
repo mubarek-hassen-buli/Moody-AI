@@ -1,16 +1,29 @@
 import { create } from 'zustand';
-import { supabase } from '@/utils/supabase';
+import { authClient } from '@/utils/auth-client';
 import { queryClient } from '@/app/_layout';
 import api from '@/utils/api';
-import type { Session, User } from '@supabase/supabase-js';
 
 /* ──────────────────────────────────────────────────────────
  * Types
  * ────────────────────────────────────────────────────────── */
 
+export interface AppUser {
+  id: string;
+  email: string;
+  name?: string | null;
+  image?: string | null;
+}
+
+export interface AppSession {
+  id: string;
+  userId: string;
+  token?: string;
+  expiresAt?: Date | string;
+}
+
 interface AuthState {
-  session: Session | null;
-  user: User | null;
+  session: AppSession | null;
+  user: AppUser | null;
   loading: boolean;
   initialized: boolean;
 
@@ -49,13 +62,8 @@ export const useAuthStore = create<AuthState>((set) => {
   /**
    * Clear all user-specific local data.
    * Called on sign-out to prevent stale data when switching accounts.
-   *
-   * NOTE: We only clear the TanStack Query cache here.
-   * Daily mood state is now sourced from the server (GET /mood/today)
-   * so there is no local SecureStore key to clean up.
    */
   const clearLocalUserData = async () => {
-    // Wipe TanStack Query cache (profiles, moods, journals, quotes, etc.)
     queryClient.clear();
   };
 
@@ -67,43 +75,22 @@ export const useAuthStore = create<AuthState>((set) => {
 
     initialize: async () => {
       try {
-        // IMPORTANT: Register the auth state change listener FIRST,
-        // before any async checks. This ensures that if another flow
-        // (like Google OAuth) calls setSession() while we're still
-        // initializing, the Zustand store will be updated.
-        supabase.auth.onAuthStateChange((_event, newSession) => {
-          set({ session: newSession, user: newSession?.user ?? null });
-          // Re-sync on token refresh / new sign-in from another flow
-          if (newSession) {
-            syncUserToBackend();
-          }
-        });
+        const { data, error } = await authClient.getSession();
 
-        // Validate the token against Supabase server, NOT just the local cache.
-        // getUser() makes a real HTTP request to verify the token is still valid.
-        // If the user was deleted in Supabase, this will return an error.
-        const { data: { user }, error } = await supabase.auth.getUser();
-
-        if (error || !user) {
-          // Token is invalid or user was deleted — clear everything
-          await supabase.auth.signOut();
+        if (error || !data?.session || !data?.user) {
           await clearLocalUserData();
           set({ session: null, user: null, initialized: true });
           return;
         }
 
-        // Token is valid, get the session for the JWT
-        const { data: { session } } = await supabase.auth.getSession();
         set({
-          session,
-          user: session?.user ?? null,
+          session: data.session as unknown as AppSession,
+          user: data.user as unknown as AppUser,
           initialized: true,
         });
 
-        // Ensure the user exists in Neon on every app cold-start
-        if (session) {
-          await syncUserToBackend();
-        }
+        // Ensure the user exists in Neon on app startup
+        await syncUserToBackend();
       } catch {
         set({ session: null, user: null, initialized: true });
       }
@@ -112,24 +99,23 @@ export const useAuthStore = create<AuthState>((set) => {
     signUp: async (email, password, name) => {
       set({ loading: true });
       try {
-        // Clear leftover data from any previous account
         await clearLocalUserData();
 
-        const { data, error } = await supabase.auth.signUp({
+        const res = await authClient.signUp.email({
           email,
           password,
-          options: {
-            data: { name },
-          },
+          name: name || email.split('@')[0],
         });
 
-        if (error) throw error;
+        if (res.error) {
+          throw new Error(res.error.message || 'Sign up failed');
+        }
 
-        set({
-          session: data.session,
-          user: data.user,
-        });
+        const sessionRes = await authClient.getSession();
+        const session = (sessionRes.data?.session ?? (res.data as any)?.session) as unknown as AppSession;
+        const user = (sessionRes.data?.user ?? (res.data as any)?.user) as unknown as AppUser;
 
+        set({ session, user });
         await syncUserToBackend();
       } finally {
         set({ loading: false });
@@ -139,21 +125,22 @@ export const useAuthStore = create<AuthState>((set) => {
     signIn: async (email, password) => {
       set({ loading: true });
       try {
-        // Clear leftover data from any previous account
         await clearLocalUserData();
 
-        const { data, error } = await supabase.auth.signInWithPassword({
+        const res = await authClient.signIn.email({
           email,
           password,
         });
 
-        if (error) throw error;
+        if (res.error) {
+          throw new Error(res.error.message || 'Invalid email or password');
+        }
 
-        set({
-          session: data.session,
-          user: data.user,
-        });
+        const sessionRes = await authClient.getSession();
+        const session = (sessionRes.data?.session ?? (res.data as any)?.session) as unknown as AppSession;
+        const user = (sessionRes.data?.user ?? (res.data as any)?.user) as unknown as AppUser;
 
+        set({ session, user });
         await syncUserToBackend();
       } finally {
         set({ loading: false });
@@ -163,9 +150,7 @@ export const useAuthStore = create<AuthState>((set) => {
     signOut: async () => {
       set({ loading: true });
       try {
-        const { error } = await supabase.auth.signOut();
-        if (error) throw error;
-
+        await authClient.signOut();
         await clearLocalUserData();
         set({ session: null, user: null });
       } finally {
@@ -174,4 +159,3 @@ export const useAuthStore = create<AuthState>((set) => {
     },
   };
 });
-

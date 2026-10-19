@@ -9,9 +9,11 @@ import {
   ParseUUIDPipe,
   Patch,
   Post,
+  Query,
   UseGuards,
 } from '@nestjs/common';
-import { SupabaseGuard } from '../../core/auth/supabase.guard.js';
+import { NeonAuthGuard } from '../../core/auth/neon-auth.guard.js';
+import type { AuthenticatedUser } from '../../core/auth/neon-auth.guard.js';
 import { CurrentUser } from '../../core/auth/current-user.decorator.js';
 import { JournalService } from './journal.service.js';
 import { VoiceJournalService } from './voice-journal.service.js';
@@ -20,7 +22,7 @@ import { UpdateJournalDto } from './dto/update-journal.dto.js';
 import { VoiceJournalDto } from './dto/voice-journal.dto.js';
 
 @Controller('journal')
-@UseGuards(SupabaseGuard)
+@UseGuards(NeonAuthGuard)
 export class JournalController {
   constructor(
     private readonly journalService: JournalService,
@@ -34,26 +36,26 @@ export class JournalController {
   @Post()
   @HttpCode(HttpStatus.CREATED)
   async create(
-    @CurrentUser() supabaseUser: any,
+    @CurrentUser() user: AuthenticatedUser,
     @Body() dto: CreateJournalDto,
   ) {
-    const entry = await this.journalService.create(supabaseUser.id, dto);
+    const entry = await this.journalService.create(user.id, dto);
     return { data: entry };
   }
 
   /**
    * POST /api/journal/voice
    * Create a journal entry from a voice recording.
-   * Sends audio to Gemini for transcription, title generation, and mood detection.
+   * Transcribes audio, detects mood, and saves to Neon.
    */
   @Post('voice')
   @HttpCode(HttpStatus.CREATED)
   async createFromVoice(
-    @CurrentUser() supabaseUser: any,
+    @CurrentUser() user: AuthenticatedUser,
     @Body() dto: VoiceJournalDto,
   ) {
     const result = await this.voiceJournalService.processVoiceEntry(
-      supabaseUser.id,
+      user.id,
       dto.audio,
     );
     return { data: result };
@@ -61,11 +63,11 @@ export class JournalController {
 
   /**
    * GET /api/journal
-   * List all journal entries (newest first).
+   * List journal entries for the current user (newest first).
    */
   @Get()
-  async findAll(@CurrentUser() supabaseUser: any) {
-    const entries = await this.journalService.findAll(supabaseUser.id);
+  async findAll(@CurrentUser() user: AuthenticatedUser) {
+    const entries = await this.journalService.findAll(user.id);
     return { data: entries };
   }
 
@@ -75,10 +77,10 @@ export class JournalController {
    */
   @Get(':id')
   async findOne(
-    @CurrentUser() supabaseUser: any,
+    @CurrentUser() user: AuthenticatedUser,
     @Param('id', ParseUUIDPipe) id: string,
   ) {
-    const entry = await this.journalService.findOne(supabaseUser.id, id);
+    const entry = await this.journalService.findOne(user.id, id);
     return { data: entry };
   }
 
@@ -88,11 +90,11 @@ export class JournalController {
    */
   @Patch(':id')
   async update(
-    @CurrentUser() supabaseUser: any,
+    @CurrentUser() user: AuthenticatedUser,
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: UpdateJournalDto,
   ) {
-    const entry = await this.journalService.update(supabaseUser.id, id, dto);
+    const entry = await this.journalService.update(user.id, id, dto);
     return { data: entry };
   }
 
@@ -103,10 +105,9 @@ export class JournalController {
   @Delete(':id')
   @HttpCode(HttpStatus.OK)
   async remove(
-    @CurrentUser() supabaseUser: any,
+    @CurrentUser() user: AuthenticatedUser,
     @Param('id', ParseUUIDPipe) id: string,
   ) {
-    return this.journalService.remove(supabaseUser.id, id);
+    return this.journalService.remove(user.id, id);
   }
 }
-

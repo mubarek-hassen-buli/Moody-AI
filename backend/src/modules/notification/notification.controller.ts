@@ -1,11 +1,12 @@
 import { Body, Controller, Post, UseGuards } from '@nestjs/common';
-import { SupabaseGuard } from '../../core/auth/supabase.guard.js';
+import { NeonAuthGuard } from '../../core/auth/neon-auth.guard.js';
+import type { AuthenticatedUser } from '../../core/auth/neon-auth.guard.js';
 import { CurrentUser } from '../../core/auth/current-user.decorator.js';
 import { NotificationService } from './notification.service.js';
 import { RegisterTokenDto } from './dto/register-token.dto.js';
 
 @Controller('notifications')
-@UseGuards(SupabaseGuard)
+@UseGuards(NeonAuthGuard)
 export class NotificationController {
   constructor(private readonly notificationService: NotificationService) {}
 
@@ -15,10 +16,10 @@ export class NotificationController {
    */
   @Post('register')
   async register(
-    @CurrentUser() supabaseUser: any,
+    @CurrentUser() user: AuthenticatedUser,
     @Body() dto: RegisterTokenDto,
   ) {
-    await this.notificationService.registerToken(supabaseUser.id, dto.token);
+    await this.notificationService.registerToken(user.id, dto.token);
     return { success: true };
   }
 }

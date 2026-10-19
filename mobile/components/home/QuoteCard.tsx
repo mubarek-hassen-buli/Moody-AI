@@ -63,7 +63,7 @@ export const QuoteCard: React.FC = () => {
       </View>
 
       {/* Quote text */}
-      <Text style={styles.quoteText}>"{quote.quoteText}"</Text>
+      <Text style={styles.quoteText}>{`"${quote.quoteText}"`}</Text>
 
       {/* Author */}
       {quote.author && (

@@ -23,7 +23,7 @@ export const Footer: React.FC = () => {
               Your daily emotional intelligence partner. Track your moods, converse with your AI wellness companion, reflect with voice journaling, and discover your emotional rhythms.
             </p>
             <div className="text-xs text-moody-tertiary">
-              Built with React Native, Expo SDK 54, NestJS, Drizzle ORM, Neon, Supabase & Google Gemini.
+              Built with React Native, Expo SDK 54, NestJS, Drizzle ORM, Neon (Database, Auth, Storage) & Google Gemini.
             </div>
           </div>
 

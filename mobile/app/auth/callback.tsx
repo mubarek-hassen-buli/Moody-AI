@@ -15,18 +15,17 @@ const AUTH_TIMEOUT_MS = 8_000;
 /* ──────────────────────────────────────────────────────────
  * Auth callback screen
  *
- * Handles the `moody://auth/callback` deep link that Supabase
- * redirects to after Google OAuth.
+ * Handles the `moody://auth/callback` deep link after OAuth.
  *
  * This screen is a **safety net**. The primary auth handling
- * happens in `useGoogleAuth`, which extracts tokens from the
- * URL and updates both Supabase and the Zustand auth store.
+ * happens in `useGoogleAuth`, which synchronizes tokens and
+ * updates the Zustand auth store.
  *
  * This screen simply watches the Zustand store:
  * - When `session` becomes available → navigate to /(tabs)
  * - If nothing happens within the timeout → fall back to /
  *
- * Why watch Zustand instead of Supabase?
+ * Why watch Zustand?
  * Because `(tabs)/_layout.tsx` checks the Zustand store.
  * Navigating before Zustand updates causes a redirect loop
  * back to onboarding.

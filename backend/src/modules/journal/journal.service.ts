@@ -1,5 +1,4 @@
 import {
-  ForbiddenException,
   Inject,
   Injectable,
   NotFoundException,
@@ -7,7 +6,7 @@ import {
 import { and, desc, eq } from 'drizzle-orm';
 import type { NeonHttpDatabase } from 'drizzle-orm/neon-http';
 import { DRIZZLE } from '../../core/database/database.module.js';
-import { journalEntries, users } from '../../core/database/schema.js';
+import { journalEntries } from '../../core/database/schema.js';
 import type * as schema from '../../core/database/schema.js';
 import { CreateJournalDto } from './dto/create-journal.dto.js';
 import { UpdateJournalDto } from './dto/update-journal.dto.js';
@@ -23,13 +22,11 @@ export class JournalService {
    * Create a journal entry
    * ───────────────────────────────────────────────────────── */
 
-  async create(supabaseUserId: string, dto: CreateJournalDto) {
-    const neonUser = await this.resolveUser(supabaseUserId);
-
+  async create(userId: string, dto: CreateJournalDto) {
     const [entry] = await this.db
       .insert(journalEntries)
       .values({
-        userId: neonUser.id,
+        userId,
         title: dto.title,
         content: dto.content,
       })
@@ -42,30 +39,27 @@ export class JournalService {
    * Get all journal entries for the user (newest first)
    * ───────────────────────────────────────────────────────── */
 
-  async findAll(supabaseUserId: string) {
-    const neonUser = await this.resolveUser(supabaseUserId);
-
+  async findAll(userId: string, limit = 100) {
     return this.db
       .select()
       .from(journalEntries)
-      .where(eq(journalEntries.userId, neonUser.id))
-      .orderBy(desc(journalEntries.createdAt));
+      .where(eq(journalEntries.userId, userId))
+      .orderBy(desc(journalEntries.createdAt))
+      .limit(limit);
   }
 
   /* ─────────────────────────────────────────────────────────
    * Get a single journal entry (ownership enforced)
    * ───────────────────────────────────────────────────────── */
 
-  async findOne(supabaseUserId: string, entryId: string) {
-    const neonUser = await this.resolveUser(supabaseUserId);
-
+  async findOne(userId: string, entryId: string) {
     const results = await this.db
       .select()
       .from(journalEntries)
       .where(
         and(
           eq(journalEntries.id, entryId),
-          eq(journalEntries.userId, neonUser.id),
+          eq(journalEntries.userId, userId),
         ),
       )
       .limit(1);
@@ -82,12 +76,12 @@ export class JournalService {
    * ───────────────────────────────────────────────────────── */
 
   async update(
-    supabaseUserId: string,
+    userId: string,
     entryId: string,
     dto: UpdateJournalDto,
   ) {
     // Verify ownership before any update
-    await this.findOne(supabaseUserId, entryId);
+    await this.findOne(userId, entryId);
 
     const [updated] = await this.db
       .update(journalEntries)
@@ -106,32 +100,14 @@ export class JournalService {
    * Delete a journal entry (ownership enforced)
    * ───────────────────────────────────────────────────────── */
 
-  async remove(supabaseUserId: string, entryId: string) {
+  async remove(userId: string, entryId: string) {
     // Verify ownership before deletion
-    await this.findOne(supabaseUserId, entryId);
+    await this.findOne(userId, entryId);
 
     await this.db
       .delete(journalEntries)
       .where(eq(journalEntries.id, entryId));
 
     return { deleted: true };
-  }
-
-  /* ─────────────────────────────────────────────────────────
-   * Private: resolve Neon user from Supabase ID
-   * ───────────────────────────────────────────────────────── */
-
-  private async resolveUser(supabaseId: string) {
-    const result = await this.db
-      .select()
-      .from(users)
-      .where(eq(users.supabaseId, supabaseId))
-      .limit(1);
-
-    if (!result[0]) {
-      throw new NotFoundException('User not found in database');
-    }
-
-    return result[0];
   }
 }

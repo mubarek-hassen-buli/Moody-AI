@@ -208,7 +208,7 @@ export default function HomeScreen() {
 
           <Text style={styles.bannerGreeting}>{getGreeting()}</Text>
           <Text style={styles.bannerTitle}>
-            Welcome back,{"\n"}how's your mind{"\n"}today?
+            {`Welcome back,\nhow's your mind\ntoday?`}
           </Text>
 
           {/* Search bar */}

@@ -23,28 +23,19 @@ export class NotificationService {
    * Token Management
    * ───────────────────────────────────────────────────────── */
 
-  async registerToken(supabaseUserId: string, token: string) {
-    const user = await this.db
-      .select({ id: users.id })
-      .from(users)
-      .where(eq(users.supabaseId, supabaseUserId))
-      .limit(1);
-
-    if (user.length === 0) return;
-
-    // Upsert token
+  async registerToken(userId: string, token: string) {
     await this.db
       .insert(pushTokens)
       .values({
-        userId: user[0].id,
+        userId,
         token,
       })
       .onConflictDoUpdate({
         target: pushTokens.token,
-        set: { updatedAt: new Date() },
+        set: { userId, updatedAt: new Date() },
       });
 
-    this.logger.log(`Registered push token for user ${user[0].id}`);
+    this.logger.log(`Registered push token for user ${userId}`);
   }
 
   /* ─────────────────────────────────────────────────────────
@@ -79,11 +70,7 @@ export class NotificationService {
   async handleMoodReminderCron() {
     this.logger.log('Running Mood Reminder notification job...');
 
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
+    const todayDate = new Date().toISOString().split('T')[0];
 
     // Find users who have NOT logged a mood today
     const usersToRemind = await this.db
@@ -97,8 +84,7 @@ export class NotificationService {
         sql`NOT EXISTS (
           SELECT 1 FROM ${moodEntries}
           WHERE ${moodEntries.userId} = ${users.id}
-          AND ${moodEntries.createdAt} >= ${today}
-          AND ${moodEntries.createdAt} < ${tomorrow}
+          AND ${moodEntries.entryDate} = ${todayDate}
         )`,
       );
 
@@ -121,18 +107,15 @@ export class NotificationService {
 
   private async sendBatch(messages: ExpoPushMessage[]) {
     const chunks = this.expo.chunkPushNotifications(messages);
-    const tickets: any[] = [];
 
     for (const chunk of chunks) {
       try {
-        const ticketChunk = await this.expo.sendPushNotificationsAsync(chunk);
-        tickets.push(...ticketChunk);
+        await this.expo.sendPushNotificationsAsync(chunk);
       } catch (error) {
         this.logger.error('Error sending push notification chunk:', error);
       }
     }
 
-    // Optional: Log tickets for debugging
     this.logger.log(`Sent ${messages.length} notifications in ${chunks.length} chunks.`);
   }
 }
