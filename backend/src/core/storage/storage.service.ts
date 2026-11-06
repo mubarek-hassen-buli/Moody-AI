@@ -21,14 +21,23 @@ const DATA_URI_REGEX = /^data:(image\/\w+);base64,/;
 export class StorageService {
   private readonly logger = new Logger(StorageService.name);
   private readonly s3: S3Client;
-  private readonly bucket: string;
-  private readonly endpoint: string;
+  public readonly avatarBucket: string;
+  public readonly audioBucket: string;
+  public readonly endpoint: string;
 
   constructor(private readonly configService: ConfigService) {
-    this.bucket = this.configService.get<string>('NEON_STORAGE_BUCKET', 'assets');
+    this.avatarBucket =
+      this.configService.get<string>('NEON_STORAGE_BUCKET_AVATARS') ||
+      this.configService.get<string>('NEON_STORAGE_BUCKET') ||
+      'avatars';
+
+    this.audioBucket =
+      this.configService.get<string>('NEON_STORAGE_BUCKET_AUDIO') ||
+      'audio-track';
+
     this.endpoint = this.configService.get<string>(
       'AWS_ENDPOINT_URL_S3',
-      'https://ep-weathered-flower-b4mcbmhk.storage.c-6.us-east-2.aws.neon.tech',
+      'https://ep-weathered-flower-b4mcbnhk.storage.c-6.us-east-2.aws.neon.tech',
     );
 
     this.s3 = new S3Client({
@@ -44,8 +53,13 @@ export class StorageService {
 
   /**
    * Upload a base64-encoded image to Neon Object Storage.
+   * Defaults to the avatars bucket.
    */
-  async uploadImage(base64Data: string, folder = 'avatars'): Promise<string> {
+  async uploadImage(
+    base64Data: string,
+    folder = '',
+    targetBucket?: string,
+  ): Promise<string> {
     const dataUri = base64Data.startsWith('data:')
       ? base64Data
       : `data:image/jpeg;base64,${base64Data}`;
@@ -68,23 +82,25 @@ export class StorageService {
       );
     }
 
-    const key = `${folder}/${Date.now()}-${randomUUID()}.${ext}`;
+    const bucket = targetBucket || this.avatarBucket;
+    const filename = `${Date.now()}-${randomUUID()}.${ext}`;
+    const key = folder && folder !== bucket ? `${folder}/${filename}` : filename;
 
     try {
       await this.s3.send(
         new PutObjectCommand({
-          Bucket: this.bucket,
+          Bucket: bucket,
           Key: key,
           Body: buffer,
           ContentType: mimeType,
         }),
       );
 
-      const publicUrl = `${this.endpoint}/${this.bucket}/${key}`;
-      this.logger.log(`Uploaded image to Neon Object Storage: ${publicUrl}`);
+      const publicUrl = `${this.endpoint}/${bucket}/${key}`;
+      this.logger.log(`Uploaded image to Neon Object Storage [${bucket}]: ${publicUrl}`);
       return publicUrl;
     } catch (err) {
-      this.logger.error('Neon storage upload failed:', err);
+      this.logger.error(`Neon storage upload failed for bucket "${bucket}":`, err);
       // Fallback: return data URI so user avatar still functions even if S3 keys are pending
       return dataUri;
     }
@@ -93,9 +109,14 @@ export class StorageService {
   /**
    * Generate a presigned URL to access an object.
    */
-  async getPresignedUrl(key: string, expiresIn = 3600): Promise<string> {
+  async getPresignedUrl(
+    key: string,
+    targetBucket?: string,
+    expiresIn = 3600,
+  ): Promise<string> {
+    const bucket = targetBucket || this.avatarBucket;
     const command = new GetObjectCommand({
-      Bucket: this.bucket,
+      Bucket: bucket,
       Key: key,
     });
     return getSignedUrl(this.s3, command, { expiresIn });

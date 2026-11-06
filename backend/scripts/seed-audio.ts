@@ -7,11 +7,16 @@ import * as schema from '../src/core/database/schema.js';
 const sql = neon(process.env.DATABASE_URL!);
 const db = drizzle(sql, { schema });
 
-const s3Endpoint = process.env.AWS_ENDPOINT_URL_S3 || 'https://ep-weathered-flower-b4mcbnhk.storage.c-6.us-east-2.aws.neon.tech';
-const bucket = process.env.NEON_STORAGE_BUCKET || 'assets';
+const s3Endpoint =
+  process.env.AWS_ENDPOINT_URL_S3 ||
+  'https://ep-weathered-flower-b4mcbnhk.storage.c-6.us-east-2.aws.neon.tech';
+const audioBucket =
+  process.env.NEON_STORAGE_BUCKET_AUDIO ||
+  process.env.NEON_STORAGE_BUCKET ||
+  'audio-track';
 
-// Neon Object Storage base URL for assets
-const storageBaseUrl = `${s3Endpoint}/${bucket}/audio-tracks`;
+// Neon Object Storage base URL for audio-track bucket
+const storageBaseUrl = `${s3Endpoint}/${audioBucket}`;
 
 const tracks = [
   {
@@ -67,6 +72,10 @@ const tracks = [
 async function seed() {
   console.log('🚀 Starting audio seed process for Neon Storage...');
   
+  // Clear any previous audio tracks to update URLs to audio-track bucket
+  console.log('Clearing existing audio tracks...');
+  await db.delete(schema.audioTracks);
+
   for (const track of tracks) {
     const audioUrl = `${storageBaseUrl}/${encodeURIComponent(track.filename)}`;
     console.log(`Seeding track [${track.category}]: "${track.title}" -> ${audioUrl}`);
